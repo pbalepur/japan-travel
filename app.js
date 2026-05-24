@@ -1,17 +1,32 @@
 /* ============================================================
-   Raahi — Japan 2026 Travel Itinerary
-   Data sourced from PDF itinerary + Google Sheet attractions
+   Raahi — Japan 2026 Travel Itinerary  (v3)
+   Timeline + Wishlist · Inline editing · Type icons
    ============================================================ */
+
+// ── Activity type config ──
+const ITEM_TYPES = {
+  flight:     { icon: '✈️',  label: 'Flight',     color: '#6366f1' },
+  hotel:      { icon: '🏨',  label: 'Hotel',      color: '#8b5cf6' },
+  train:      { icon: '🚅',  label: 'Train',      color: '#0284c7' },
+  bus:        { icon: '🚌',  label: 'Bus',         color: '#0d9488' },
+  walk:       { icon: '🚶',  label: 'Walk',        color: '#65a30d' },
+  taxi:       { icon: '🚕',  label: 'Taxi/Car',    color: '#d97706' },
+  attraction: { icon: '⛩️',  label: 'See',         color: '#c53d2d' },
+  food:       { icon: '🍽️',  label: 'Food',        color: '#ea580c' },
+  shopping:   { icon: '🛍️',  label: 'Shopping',    color: '#db2777' },
+  event:      { icon: '🎵',  label: 'Event',       color: '#7c3aed' },
+  buffer:     { icon: '⏳',  label: 'Buffer',      color: '#78716c' },
+};
 
 // ── City theme config ──
 const CITIES = {
-  transit:    { name: 'In Transit',  color: '#78716c', bg: '#f5f0e8', emoji: '✈️' },
-  tokyo:      { name: 'Tokyo',      color: '#1e3a5f', bg: '#e8eef5', emoji: '🗼' },
-  fuji:       { name: 'Mt. Fuji',   color: '#4d7c0f', bg: '#f0f5e8', emoji: '🗻' },
-  kyoto:      { name: 'Kyoto',      color: '#c53d2d', bg: '#fef2f0', emoji: '⛩️' },
-  kobe:       { name: 'Kobe',       color: '#b8860b', bg: '#fdf6e3', emoji: '🌉' },
-  hiroshima:  { name: 'Hiroshima',  color: '#0d6e6e', bg: '#e6f5f5', emoji: '🕊️' },
-  home:       { name: 'Home',       color: '#78716c', bg: '#f5f0e8', emoji: '🏠' },
+  transit:    { name: 'In Transit',  color: '#78716c', bg: '#f5f0e8', emoji: '✈️', img: '' },
+  tokyo:      { name: 'Tokyo',      color: '#1e3a5f', bg: '#e8eef5', emoji: '🗼', img: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=250&fit=crop' },
+  fuji:       { name: 'Mt. Fuji',   color: '#4d7c0f', bg: '#f0f5e8', emoji: '🗻', img: 'https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?w=400&h=250&fit=crop' },
+  kyoto:      { name: 'Kyoto',      color: '#c53d2d', bg: '#fef2f0', emoji: '⛩️', img: 'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=400&h=250&fit=crop' },
+  kobe:       { name: 'Kobe',       color: '#b8860b', bg: '#fdf6e3', emoji: '🌉', img: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&h=250&fit=crop' },
+  hiroshima:  { name: 'Hiroshima',  color: '#0d6e6e', bg: '#e6f5f5', emoji: '🕊️', img: 'https://images.unsplash.com/photo-1526481280693-3bfa7568e0f3?w=400&h=250&fit=crop' },
+  home:       { name: 'Home',       color: '#78716c', bg: '#f5f0e8', emoji: '🏠', img: '' },
 };
 
 // ── Route overview data ──
@@ -24,7 +39,19 @@ const ROUTE = [
   { city: 'Tokyo',     dates: 'Jun 22–23', nights: 1, key: 'tokyo' },
 ];
 
-// ── Day-by-day itinerary (merged PDF + Google Sheet) ──
+// ── Known transit times (minutes) for travel intelligence ──
+const TRANSIT_TIMES = {
+  'tokyo→kawaguchiko':   { mode: 'bus',   label: 'Highway bus / train via Otsuki', min: 120 },
+  'kawaguchiko→mishima': { mode: 'bus',   label: 'Bus to Mishima',                 min: 90  },
+  'mishima→kyoto':       { mode: 'train', label: 'Shinkansen Hikari',              min: 110 },
+  'tokyo→kyoto':         { mode: 'train', label: 'Shinkansen Nozomi',              min: 135 },
+  'kyoto→kobe':          { mode: 'train', label: 'JR Special Rapid',               min: 50  },
+  'kobe→hiroshima':      { mode: 'train', label: 'Shinkansen',                     min: 70  },
+  'hiroshima→tokyo':     { mode: 'train', label: 'Shinkansen Nozomi',              min: 240 },
+  'hiroshima→miyajima':  { mode: 'train', label: 'JR + Ferry',                     min: 50  },
+};
+
+// ── Day-by-day itinerary ──
 const DAYS = [
   {
     date: '2026-06-09', dayNum: 1,
@@ -447,14 +474,15 @@ const BOOKINGS = [
   },
 ];
 
-// ── DOM refs ──
+// ===================================================================
+//  UTILITIES
+// ===================================================================
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 const dayList      = $('#day-list');
 const bookingGrid  = $('#booking-grid');
-const addForm      = $('#add-form');
-const addDay       = $('#add-day');
 const askForm      = $('#ask-form');
 const askInput     = $('#ask-input');
 const askAnswer    = $('#ask-answer');
@@ -463,7 +491,6 @@ const notifyStatus = $('#notify-status');
 const countdownEl  = $('#countdown');
 const stickyNav    = $('#sticky-nav');
 
-// ── Formatters ──
 const fmtDate  = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const fmtDay   = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
 const fmtMonth = new Intl.DateTimeFormat('en-US', { month: 'short' });
@@ -471,15 +498,206 @@ const fmtWkday = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
 function parseDate(str) { return new Date(str + 'T12:00:00'); }
 
-// ── localStorage for custom activities ──
-const STORE_KEY = 'japan2026_custom';
-let customActivities = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-
-function saveCustom() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(customActivities));
+function mapsUrl(query) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query + ', Japan')}`;
 }
 
-// ── SVG icons ──
+function generateId() {
+  return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+// Convert "3:00 PM" → "15:00"
+function to24h(str) {
+  if (!str) return null;
+  const m = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return null;
+  let h = parseInt(m[1]);
+  const ampm = m[3].toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${m[2]}`;
+}
+
+// "15:00" → "3:00 PM"
+function to12h(t24) {
+  if (!t24) return '';
+  const [hh, mm] = t24.split(':').map(Number);
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  const h = hh % 12 || 12;
+  return `${h}:${String(mm).padStart(2, '0')} ${ampm}`;
+}
+
+// Extract time from text like "Depart 12:20 PM"
+function extractTime(text) {
+  const m = text.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  return m ? to24h(m[0]) : null;
+}
+
+// ===================================================================
+//  AUTO-DETECT ACTIVITY TYPE FROM TEXT
+// ===================================================================
+
+function detectType(text) {
+  const t = text.toLowerCase();
+  if (/\bua\s?\d|flight|depart.*airport|arrive.*airport|\bnrt\b|\bsfo\b|airport transfer|boeing/i.test(t)) return 'flight';
+  if (/shinkansen|\btrain\b|\brail\b|\bjr\b/i.test(t)) return 'train';
+  if (/\bbus\b|highway bus/i.test(t)) return 'bus';
+  if (/\bwalk\b|stroll|walking/i.test(t)) return 'walk';
+  if (/taxi|uber|transfer|move bags|\bcab\b|\bcar\b|ride/i.test(t)) return 'taxi';
+  if (/dinner|lunch|breakfast|meal|eat|ramen|food|cafe|restaurant|okonomiyaki|dining|food hall/i.test(t)) return 'food';
+  if (/shop|market|department store|nishiki|tsukiji|kappabashi/i.test(t)) return 'shopping';
+  if (/concert|performance|festival|music|theater|hall|choir|exchange/i.test(t)) return 'event';
+  if (/buffer|free|flexible|optional|pending|settle|packing/i.test(t)) return 'buffer';
+  if (/check.?in|check.?out|hotel|aloft|toranomon|ubuya|ace hotel|crowne|hilton|marriott/i.test(t)) return 'hotel';
+  return 'attraction';
+}
+
+// ===================================================================
+//  DATA LAYER — Convert legacy format + localStorage edits
+// ===================================================================
+
+const STORE_KEY = 'raahi_v3_items';
+
+function loadEdits() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); }
+  catch { return {}; }
+}
+
+function saveEdits(edits) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(edits));
+}
+
+let userEdits = loadEdits();
+
+// Migrate v2 custom activities if present
+(function migrateV2() {
+  const old = localStorage.getItem('japan2026_custom');
+  if (!old) return;
+  try {
+    const v2 = JSON.parse(old);
+    Object.entries(v2).forEach(([idx, items]) => {
+      if (!userEdits[idx]) userEdits[idx] = { added: [], deleted: [] };
+      items.forEach(item => {
+        userEdits[idx].added.push({
+          id: generateId(),
+          type: detectType(item.title),
+          time: null,
+          title: item.title,
+          notes: item.notes || '',
+          status: 'wishlist',
+        });
+      });
+    });
+    saveEdits(userEdits);
+    localStorage.removeItem('japan2026_custom');
+  } catch {}
+})();
+
+// Convert a legacy DAYS entry into typed items
+function legacyToItems(day) {
+  const items = [];
+  const dayUrl = (label) => day.links.find(l =>
+    new RegExp(label, 'i').test(l.label))?.url;
+
+  // Hotel check-in (only on first day at a hotel)
+  if (day.hotel?.checkin) {
+    items.push({
+      id: `b-${day.dayNum}-hi`,
+      type: 'hotel',
+      time: to24h(day.hotel.checkin),
+      title: `Check in · ${day.hotel.name}`,
+      notes: [day.hotel.room, day.hotel.address].filter(Boolean).join(' · '),
+      status: 'confirmed',
+      confirmation: day.hotel.conf,
+      url: dayUrl('marriott|hyatt|hilton|ihg|ace|ubuya'),
+    });
+  }
+
+  // Hotel checkout note (from previous hotel)
+  if (day.hotel?.note) {
+    const coMatch = day.hotel.note.match(/(\w[\w\s]+?)\s+checkout\s+(\d{1,2}[:\s]?\d{0,2}\s*[AP]M)/i);
+    if (coMatch) {
+      items.push({
+        id: `b-${day.dayNum}-co`,
+        type: 'hotel',
+        time: to24h(coMatch[2]),
+        title: `Check out · ${coMatch[1].trim()}`,
+        status: 'confirmed',
+      });
+    }
+  }
+
+  // Transport
+  day.transport.forEach((t, i) => {
+    const time = extractTime(t);
+    items.push({
+      id: `b-${day.dayNum}-t${i}`,
+      type: detectType(t),
+      time,
+      title: t.replace(/\d{1,2}:\d{2}\s*(AM|PM)\s*/gi, '').trim() || t,
+      notes: time ? '' : '',
+      status: time ? 'confirmed' : 'tentative',
+    });
+  });
+
+  // Attractions
+  day.attractions.forEach((a, i) => {
+    items.push({
+      id: `b-${day.dayNum}-a${i}`,
+      type: detectType(a),
+      time: null,
+      title: a,
+      status: 'wishlist',
+    });
+  });
+
+  // Events
+  day.events.forEach((e, i) => {
+    items.push({
+      id: `b-${day.dayNum}-e${i}`,
+      type: detectType(e),
+      time: null,
+      title: e,
+      status: 'tentative',
+    });
+  });
+
+  return items;
+}
+
+// Get final items for a day (base + user edits)
+function getItemsForDay(dayIdx) {
+  const base = legacyToItems(DAYS[dayIdx]);
+  const edits = userEdits[dayIdx] || { added: [], deleted: [] };
+  const deleted = new Set(edits.deleted || []);
+  const filtered = base.filter(i => !deleted.has(i.id));
+  const added = edits.added || [];
+  return [...filtered, ...added];
+}
+
+function addItem(dayIdx, item) {
+  if (!userEdits[dayIdx]) userEdits[dayIdx] = { added: [], deleted: [] };
+  userEdits[dayIdx].added.push(item);
+  saveEdits(userEdits);
+}
+
+function deleteItem(dayIdx, itemId) {
+  if (!userEdits[dayIdx]) userEdits[dayIdx] = { added: [], deleted: [] };
+  // If it's a user-added item, remove it from added list
+  const addedIdx = userEdits[dayIdx].added.findIndex(i => i.id === itemId);
+  if (addedIdx >= 0) {
+    userEdits[dayIdx].added.splice(addedIdx, 1);
+  } else {
+    // It's a base item — mark as deleted
+    userEdits[dayIdx].deleted.push(itemId);
+  }
+  saveEdits(userEdits);
+}
+
+// ===================================================================
+//  SVG ICONS (for navigation elements)
+// ===================================================================
+
 const ICONS = {
   plane: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>',
   hotel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/><path d="m9 16 .348-.24c1.465-1.013 3.84-1.013 5.304 0L15 16"/><path d="M8 7h.01M16 7h.01M12 7h.01M12 11h.01M16 11h.01M8 11h.01"/></svg>',
@@ -488,17 +706,35 @@ const ICONS = {
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   mapPin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
 };
 
-// ── Google Maps URL helper ──
-function mapsUrl(query) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query + ', Japan')}`;
-}
+// ===================================================================
+//  RENDER: City Navigation
+// ===================================================================
 
-// ===== RENDER: City Navigation =====
 function renderCityNav() {
   const cityNav = $('#city-nav');
-  cityNav.innerHTML = ROUTE.map((stop, i) => {
+
+  // Route visualization
+  const routeVis = `
+    <div class="route-visual">
+      <div class="route-line">
+        <span class="route-stop-dot" style="background:${CITIES.transit.color}">✈️</span>
+        ${ROUTE.map(r => {
+          const c = CITIES[r.key];
+          return `<span class="route-arrow">→</span><span class="route-stop-dot" style="background:${c.color}">${c.emoji}</span>`;
+        }).join('')}
+        <span class="route-arrow">→</span>
+        <span class="route-stop-dot" style="background:${CITIES.home.color}">🏠</span>
+      </div>
+      <a class="route-map-link" href="https://www.google.com/maps/dir/Tokyo/Mount+Fuji/Kyoto/Kobe/Hiroshima/Tokyo" target="_blank" rel="noreferrer">
+        ${ICONS.mapPin} View full route in Google Maps
+      </a>
+    </div>`;
+
+  const cards = ROUTE.map((stop, i) => {
     const c = CITIES[stop.key];
     const dayCount = DAYS.filter(d => d.cityKey === stop.key).length;
     const hotels = [...new Set(
@@ -509,18 +745,22 @@ function renderCityNav() {
 
     return `
       <button class="city-card" data-city="${stop.key}" data-idx="${i}" style="--city-color:${c.color}; --city-bg:${c.bg}">
-        <span class="city-emoji">${c.emoji}</span>
-        <div class="city-card-info">
-          <h3>${stop.city}</h3>
-          <span class="city-dates">${stop.dates}</span>
-          <span class="city-meta">${stop.nights}n · ${dayCount} day${dayCount > 1 ? 's' : ''}</span>
-          ${hotelPreview ? `<span class="city-hotel">${hotelPreview}</span>` : ''}
+        ${c.img ? `<div class="city-card-img"><img src="${c.img}" alt="${stop.city}" loading="lazy"></div>` : ''}
+        <div class="city-card-body">
+          <div class="city-card-info">
+            <h3>${c.emoji} ${stop.city}</h3>
+            <span class="city-dates">${stop.dates}</span>
+            <span class="city-meta">${stop.nights}n · ${dayCount} day${dayCount > 1 ? 's' : ''}</span>
+            ${hotelPreview ? `<span class="city-hotel">${hotelPreview}</span>` : ''}
+          </div>
+          <a class="city-map-link" href="${mapsUrl(stop.city)}" target="_blank" rel="noreferrer" title="Open in Google Maps" onclick="event.stopPropagation()">
+            ${ICONS.mapPin}
+          </a>
         </div>
-        <a class="city-map-link" href="${mapsUrl(stop.city)}" target="_blank" rel="noreferrer" title="Open in Google Maps" onclick="event.stopPropagation()">
-          ${ICONS.mapPin}
-        </a>
       </button>`;
   }).join('');
+
+  cityNav.innerHTML = routeVis + `<div class="city-cards-row">${cards}</div>`;
 
   // Click handler: scroll to first day of that city
   cityNav.querySelectorAll('.city-card').forEach(btn => {
@@ -529,9 +769,8 @@ function renderCityNav() {
       const cityKey = btn.dataset.city;
       const firstDayIdx = DAYS.findIndex(d => d.cityKey === cityKey);
       if (firstDayIdx >= 0) {
-        // Make sure "all" filter is active
         const allBtn = $('.filter-btn[data-filter="all"]');
-        if (allBtn && !allBtn.classList.matches?.('active')) {
+        if (allBtn) {
           $$('.filter-btn').forEach(b => b.classList.remove('active'));
           allBtn.classList.add('active');
           renderDays('all');
@@ -549,66 +788,61 @@ function renderCityNav() {
   });
 }
 
-// ===== RENDER: Day Cards (uniform height, expandable) =====
+// ===================================================================
+//  RENDER: Day Cards — Timeline + Wishlist
+// ===================================================================
+
 function renderDays(filter = 'all') {
   dayList.innerHTML = DAYS.map((day, idx) => {
     const d = parseDate(day.date);
     const c = CITIES[day.cityKey] || CITIES.transit;
-    const custom = customActivities[idx] || [];
 
     // Filter logic
     const hasTransport = day.transport && day.transport.length > 0;
     const isFlex = day.attractions.some(a => /flexible|pending|add|buffer|optional|free|open/i.test(a)) || day.attractions.length <= 2;
     const isExplore = day.attractions.length > 2 && !hasTransport;
-
     if (filter === 'travel' && !hasTransport) return '';
     if (filter === 'explore' && !isExplore && hasTransport) return '';
     if (filter === 'flexible' && !isFlex) return '';
 
+    // Get all items for this day
+    const allItems = getItemsForDay(idx);
+    const timed = allItems.filter(i => i.time).sort((a, b) => a.time.localeCompare(b.time));
+    const untimed = allItems.filter(i => !i.time);
+
     // Counts
-    const actCount = day.attractions.length + day.events.length + custom.length;
+    const totalCount = allItems.length;
     const hotelName = day.hotel?.name || 'In transit';
-    const previewItems = [...day.attractions.slice(0, 2)];
-    const previewText = previewItems.join(' · ');
 
-    // Build activity list with Google Maps links
-    const activitiesHtml = [
-      ...day.attractions.map(a => {
-        const isGeneric = /travel day|home arrival|airport|buffer|no transfer/i.test(a);
-        return isGeneric
-          ? `<li>${a}</li>`
-          : `<li><a href="${mapsUrl(a)}" target="_blank" rel="noreferrer">${a} <span class="maps-hint">${ICONS.mapPin}</span></a></li>`;
-      }),
-      ...day.events.map(e =>
-        `<li class="event"><a href="${mapsUrl(e)}" target="_blank" rel="noreferrer">${e} <span class="maps-hint">${ICONS.mapPin}</span></a></li>`
-      ),
-      ...custom.map(c =>
-        `<li class="added">${c.title}${c.notes ? ' — ' + c.notes : ''}</li>`
-      ),
-    ].join('');
-
-    // Hotel section
-    const hotelHtml = day.hotel ? `
-      <div class="detail-block detail-stay">
-        <h4>Stay</h4>
-        <p class="detail-primary">${day.hotel.name}</p>
-        ${day.hotel.room ? `<p class="detail-secondary">${day.hotel.room}</p>` : ''}
-        ${day.hotel.address ? `<p class="detail-secondary"><a href="${mapsUrl(day.hotel.name + ', ' + (day.hotel.address || ''))}" target="_blank" rel="noreferrer">${day.hotel.address} <span class="maps-hint">${ICONS.mapPin}</span></a></p>` : ''}
-        ${day.hotel.checkin ? `<p class="detail-secondary">Check-in ${day.hotel.checkin} · Out ${day.hotel.checkout}</p>` : ''}
-        ${day.hotel.conf ? `<p class="detail-secondary">Conf: ${day.hotel.conf}</p>` : ''}
-        ${day.hotel.note ? `<p class="detail-note">${day.hotel.note}</p>` : ''}
+    // Build timeline HTML
+    const timelineHtml = timed.length ? `
+      <div class="day-timeline">
+        <h5 class="section-label">Scheduled</h5>
+        ${timed.map(item => renderItem(item, idx, true)).join('')}
       </div>` : '';
 
-    // Transport section
-    const transportHtml = day.transport.length ? `
-      <div class="detail-block detail-travel">
-        <h4>Travel</h4>
-        <ul>${day.transport.map(t => `<li>${t}</li>`).join('')}</ul>
+    // Build wishlist HTML
+    const wishlistHtml = untimed.length ? `
+      <div class="day-wishlist">
+        <h5 class="section-label">${timed.length ? 'Ideas & Wishlist' : 'Activities'}</h5>
+        ${untimed.map(item => renderItem(item, idx, false)).join('')}
+      </div>` : '';
+
+    // Hotel summary (non-check-in days)
+    const stayHtml = day.hotel && !day.hotel.checkin ? `
+      <div class="day-stay-badge">
+        <span class="stay-icon">🏨</span>
+        <span>${day.hotel.name}${day.hotel.conf ? ` · ${day.hotel.conf}` : ''}</span>
       </div>` : '';
 
     // Links
     const linksHtml = day.links.map(l =>
-      `<a class="day-link" href="${l.url}" target="_blank" rel="noreferrer">${ICONS.arrow} ${l.label}</a>`
+      `<a class="day-link" href="${l.url}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${ICONS.arrow} ${l.label}</a>`
+    ).join('');
+
+    // Type dropdown options
+    const typeOptions = Object.entries(ITEM_TYPES).map(([k, v]) =>
+      `<option value="${k}">${v.icon} ${v.label}</option>`
     ).join('');
 
     return `
@@ -625,21 +859,34 @@ function renderDays(filter = 'all') {
               <span class="day-city-pill" style="background:${c.bg}; color:${c.color}">${c.name}</span>
             </div>
             <div class="day-preview">
-              <span class="preview-text">${actCount} activit${actCount !== 1 ? 'ies' : 'y'} · ${hotelName}</span>
+              <span class="preview-text">${totalCount} item${totalCount !== 1 ? 's' : ''} · ${hotelName}</span>
               <span class="expand-icon">${ICONS.chevron}</span>
             </div>
           </div>
           <div class="day-details">
-            <div class="day-detail-grid">
-              <div class="detail-block detail-activities">
-                <h4>Activities</h4>
-                <ul class="activity-list">${activitiesHtml || '<li class="empty">No activities planned yet</li>'}</ul>
-              </div>
-              ${hotelHtml}
-              ${transportHtml}
+            ${stayHtml}
+            ${timelineHtml}
+            ${wishlistHtml}
+            ${!timed.length && !untimed.length ? '<p class="empty-day">No activities yet — add some below!</p>' : ''}
+            <div class="day-action-bar">
+              <button class="day-add-btn" data-idx="${idx}" onclick="event.stopPropagation()">
+                ${ICONS.plus} Add activity
+              </button>
             </div>
+            <form class="inline-add-form" data-idx="${idx}" style="display:none" onclick="event.stopPropagation()">
+              <div class="iaf-row">
+                <select class="iaf-type" name="type">${typeOptions}</select>
+                <input class="iaf-time" type="time" name="time" placeholder="Time">
+              </div>
+              <input class="iaf-title" type="text" name="title" placeholder="Activity name..." required>
+              <input class="iaf-notes" type="text" name="notes" placeholder="Notes (optional)">
+              <div class="iaf-actions">
+                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                <button type="button" class="btn btn-outline btn-sm iaf-cancel">Cancel</button>
+              </div>
+            </form>
             <div class="day-links">
-              <a class="day-link" href="${mapsUrl(c.name === 'In Transit' || c.name === 'Home' ? 'Tokyo' : c.name)}" target="_blank" rel="noreferrer">${ICONS.pin} ${c.name === 'In Transit' || c.name === 'Home' ? 'Tokyo' : c.name} in Maps</a>
+              <a class="day-link" href="${mapsUrl(c.name === 'In Transit' || c.name === 'Home' ? 'Tokyo' : c.name)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${ICONS.pin} ${c.name === 'In Transit' || c.name === 'Home' ? 'Tokyo' : c.name} in Maps</a>
               ${linksHtml}
             </div>
           </div>
@@ -647,18 +894,283 @@ function renderDays(filter = 'all') {
       </article>`;
   }).join('');
 
-  // Expand/collapse click handlers
+  // Attach event handlers
+  attachDayHandlers();
+  highlightToday();
+}
+
+// Render a single item (timeline or wishlist)
+function renderItem(item, dayIdx, isTimed) {
+  const typeInfo = ITEM_TYPES[item.type] || ITEM_TYPES.attraction;
+  const isLocation = !['flight', 'buffer', 'hotel'].includes(item.type);
+  const isHotelCheckin = item.type === 'hotel' && /check\s*in/i.test(item.title);
+  const isHotelCheckout = item.type === 'hotel' && /check\s*out/i.test(item.title);
+
+  let titleHtml;
+  if (item.url) {
+    titleHtml = `<a href="${item.url}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${item.title}</a>`;
+  } else if (isLocation) {
+    titleHtml = `<a href="${mapsUrl(item.title)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">${item.title} <span class="maps-link-icon">${ICONS.mapPin}</span></a>`;
+  } else {
+    titleHtml = item.title;
+  }
+
+  const statusClass = item.status === 'confirmed' ? 'status-confirmed'
+    : item.status === 'tentative' ? 'status-tentative' : '';
+
+  if (isTimed) {
+    return `
+      <div class="tl-item ${statusClass}" data-id="${item.id}" data-type="${item.type}">
+        <div class="tl-time">${to12h(item.time)}</div>
+        <div class="tl-marker">
+          <span class="tl-dot" style="--type-color:${typeInfo.color}">${typeInfo.icon}</span>
+        </div>
+        <div class="tl-body">
+          <div class="tl-title">${titleHtml}</div>
+          ${item.notes ? `<div class="tl-meta">${item.notes}</div>` : ''}
+          ${item.confirmation ? `<div class="tl-conf">Conf: ${item.confirmation}</div>` : ''}
+        </div>
+        <button class="item-del" data-idx="${dayIdx}" data-id="${item.id}" title="Remove" onclick="event.stopPropagation()">×</button>
+      </div>`;
+  }
+
+  return `
+    <div class="wl-item ${statusClass}" data-id="${item.id}" data-type="${item.type}">
+      <span class="wl-icon">${typeInfo.icon}</span>
+      <div class="wl-body">
+        <div class="wl-title">${titleHtml}</div>
+        ${item.notes ? `<div class="wl-meta">${item.notes}</div>` : ''}
+      </div>
+      <button class="item-del" data-idx="${dayIdx}" data-id="${item.id}" title="Remove" onclick="event.stopPropagation()">×</button>
+    </div>`;
+}
+
+// ===================================================================
+//  EVENT HANDLERS
+// ===================================================================
+
+function attachDayHandlers() {
+  // Expand/collapse
   dayList.querySelectorAll('.day-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('a')) return;
+      if (e.target.closest('a') || e.target.closest('button') || e.target.closest('form') || e.target.closest('input') || e.target.closest('select')) return;
       card.classList.toggle('expanded');
     });
   });
 
-  highlightToday();
+  // Add buttons
+  dayList.querySelectorAll('.day-add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = btn.dataset.idx;
+      const form = dayList.querySelector(`.inline-add-form[data-idx="${idx}"]`);
+      if (form) {
+        form.style.display = form.style.display === 'none' ? 'grid' : 'none';
+        if (form.style.display === 'grid') {
+          form.querySelector('.iaf-title').focus();
+        }
+      }
+    });
+  });
+
+  // Cancel buttons
+  dayList.querySelectorAll('.iaf-cancel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const form = btn.closest('.inline-add-form');
+      form.style.display = 'none';
+      form.reset();
+    });
+  });
+
+  // Submit inline add forms
+  dayList.querySelectorAll('.inline-add-form').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const idx = parseInt(form.dataset.idx);
+      const fd = new FormData(form);
+      const title = fd.get('title').toString().trim();
+      if (!title) return;
+
+      const item = {
+        id: generateId(),
+        type: fd.get('type'),
+        time: fd.get('time') || null,
+        title,
+        notes: fd.get('notes')?.toString().trim() || '',
+        status: fd.get('time') ? 'tentative' : 'wishlist',
+      };
+
+      addItem(idx, item);
+      form.reset();
+      form.style.display = 'none';
+
+      const activeFilter = $('.filter-btn.active')?.dataset.filter || 'all';
+      renderDays(activeFilter);
+      // Re-expand the card we were editing
+      requestAnimationFrame(() => {
+        const card = dayList.querySelector(`.day-card[data-idx="${idx}"]`);
+        if (card) card.classList.add('expanded');
+      });
+    });
+  });
+
+  // Delete buttons
+  dayList.querySelectorAll('.item-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      const id = btn.dataset.id;
+      deleteItem(idx, id);
+
+      const activeFilter = $('.filter-btn.active')?.dataset.filter || 'all';
+      renderDays(activeFilter);
+      requestAnimationFrame(() => {
+        const card = dayList.querySelector(`.day-card[data-idx="${idx}"]`);
+        if (card) card.classList.add('expanded');
+      });
+    });
+  });
 }
 
-// ===== RENDER: Bookings =====
+// ===================================================================
+//  BULK PASTE
+// ===================================================================
+
+function initBulkPaste() {
+  const modal = $('#bulk-modal');
+  const openBtn = $('#bulk-open-btn');
+  const closeBtn = $('#bulk-close');
+  const form = $('#bulk-form');
+  const preview = $('#bulk-preview');
+  const textarea = $('#bulk-text');
+
+  if (!modal || !openBtn) return;
+
+  openBtn.addEventListener('click', () => {
+    modal.classList.add('open');
+    textarea.focus();
+  });
+
+  closeBtn.addEventListener('click', () => {
+    modal.classList.remove('open');
+    form.reset();
+    preview.innerHTML = '';
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.classList.remove('open');
+      form.reset();
+      preview.innerHTML = '';
+    }
+  });
+
+  // Live preview as user types
+  textarea.addEventListener('input', () => {
+    const lines = textarea.value.split('\n').filter(l => l.trim());
+    const parsed = lines.map(parseBulkLine).filter(Boolean);
+    preview.innerHTML = parsed.length
+      ? parsed.map(p => {
+          const typeInfo = ITEM_TYPES[p.type] || ITEM_TYPES.attraction;
+          return `<div class="bulk-preview-item">
+            <span>${typeInfo.icon}</span>
+            <span>${p.dayNum ? `Day ${p.dayNum}` : '?'}</span>
+            <span>${p.time ? to12h(p.time) : '—'}</span>
+            <span>${p.title}</span>
+          </div>`;
+        }).join('')
+      : '<p class="bulk-hint">Enter activities, one per line. Format: <code>Day 6 8:15am Shinkansen to Kyoto</code></p>';
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const lines = textarea.value.split('\n').filter(l => l.trim());
+    const parsed = lines.map(parseBulkLine).filter(Boolean);
+    let added = 0;
+
+    parsed.forEach(p => {
+      if (!p.dayNum || p.dayNum < 1 || p.dayNum > DAYS.length) return;
+      const dayIdx = p.dayNum - 1;
+      addItem(dayIdx, {
+        id: generateId(),
+        type: p.type,
+        time: p.time,
+        title: p.title,
+        notes: '',
+        status: p.time ? 'tentative' : 'wishlist',
+      });
+      added++;
+    });
+
+    modal.classList.remove('open');
+    form.reset();
+    preview.innerHTML = '';
+
+    if (added > 0) {
+      const activeFilter = $('.filter-btn.active')?.dataset.filter || 'all';
+      renderDays(activeFilter);
+      showToast(`Added ${added} activit${added > 1 ? 'ies' : 'y'}`);
+    }
+  });
+}
+
+function parseBulkLine(line) {
+  line = line.trim();
+  if (!line) return null;
+
+  let dayNum = null;
+  let time = null;
+
+  // Extract "Day N" or just a leading number
+  const dayMatch = line.match(/^(?:day\s+)?(\d{1,2})\b[,:\s]*/i);
+  if (dayMatch) {
+    const n = parseInt(dayMatch[1]);
+    if (n >= 1 && n <= 15) {
+      dayNum = n;
+      line = line.slice(dayMatch[0].length).trim();
+    }
+  }
+
+  // Extract time (8:15am, 14:30, 3pm, etc.)
+  const timeMatch = line.match(/^(\d{1,2}):?(\d{2})?\s*(am|pm)?\b[,:\s]*/i);
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1]);
+    const m = parseInt(timeMatch[2] || '0');
+    const ampm = (timeMatch[3] || '').toLowerCase();
+    if (ampm === 'pm' && h < 12) h += 12;
+    if (ampm === 'am' && h === 12) h = 0;
+    if (!ampm && h <= 12 && timeMatch[2]) {
+      // Assume 24h if no am/pm and has minutes
+    }
+    if (h >= 0 && h < 24) {
+      time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      line = line.slice(timeMatch[0].length).trim();
+    }
+  }
+
+  const title = line.trim();
+  if (!title) return null;
+
+  return { dayNum, time, title, type: detectType(title) };
+}
+
+// Toast notification
+function showToast(msg) {
+  const existing = $('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+
+// ===================================================================
+//  RENDER: Bookings
+// ===================================================================
+
 function renderBookings() {
   bookingGrid.innerHTML = BOOKINGS.map((b) => {
     const c = CITIES[b.colorKey] || CITIES.transit;
@@ -682,14 +1194,10 @@ function renderBookings() {
   }).join('');
 }
 
-// ===== RENDER: Day Selector for Quick Add =====
-function renderDayOptions() {
-  addDay.innerHTML = DAYS.map((day, idx) =>
-    `<option value="${idx}">${fmtDate.format(parseDate(day.date))} — ${day.title}</option>`
-  ).join('');
-}
+// ===================================================================
+//  TRIP STATUS & COUNTDOWN
+// ===================================================================
 
-// ===== TRIP STATUS ENGINE =====
 function getTripStatus() {
   const now = new Date();
   const tripStart = new Date('2026-06-09T00:00:00-07:00');
@@ -715,10 +1223,8 @@ function getTripStatus() {
   };
 }
 
-// ===== RENDER: Countdown =====
 function renderCountdown() {
   const status = getTripStatus();
-
   if (status.phase === 'before') {
     countdownEl.textContent = `${status.daysUntil} day${status.daysUntil !== 1 ? 's' : ''} until departure`;
   } else if (status.phase === 'during') {
@@ -730,7 +1236,6 @@ function renderCountdown() {
   }
 }
 
-// ===== HIGHLIGHT TODAY + AUTO-SCROLL =====
 function highlightToday() {
   const status = getTripStatus();
   if (status.phase !== 'during') return;
@@ -739,8 +1244,7 @@ function highlightToday() {
     const cards = document.querySelectorAll('.day-card');
     if (!cards[status.dayIndex]) return;
 
-    cards[status.dayIndex].classList.add('is-today');
-    cards[status.dayIndex].classList.add('expanded');
+    cards[status.dayIndex].classList.add('is-today', 'expanded');
 
     const header = cards[status.dayIndex].querySelector('.day-header');
     if (header && !header.querySelector('.today-badge')) {
@@ -767,7 +1271,10 @@ function highlightToday() {
   });
 }
 
-// ===== STICKY NAV =====
+// ===================================================================
+//  STICKY NAV
+// ===================================================================
+
 function initStickyNav() {
   const hero = $('#top');
   if (!hero || !stickyNav) return;
@@ -778,7 +1285,6 @@ function initStickyNav() {
 
   observer.observe(hero);
 
-  // Active link tracking
   const sections = ['route', 'itinerary', 'bookings', 'ask'];
   const snavLinks = stickyNav.querySelectorAll('.snav-link');
 
@@ -786,23 +1292,24 @@ function initStickyNav() {
     let current = sections[0];
     for (const id of sections) {
       const el = document.getElementById(id);
-      if (el && el.getBoundingClientRect().top <= 120) {
-        current = id;
-      }
+      if (el && el.getBoundingClientRect().top <= 120) current = id;
     }
     snavLinks.forEach(link => {
       link.classList.toggle('active', link.dataset.section === current);
     });
   }
 
-  let scrollTimer;
+  let st;
   window.addEventListener('scroll', () => {
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(updateActive, 60);
+    clearTimeout(st);
+    st = setTimeout(updateActive, 60);
   }, { passive: true });
 }
 
-// ===== FILTERS =====
+// ===================================================================
+//  FILTERS
+// ===================================================================
+
 $$('.filter-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     $$('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -811,25 +1318,10 @@ $$('.filter-btn').forEach((btn) => {
   });
 });
 
-// ===== QUICK ADD =====
-addForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const fd = new FormData(addForm);
-  const idx = fd.get('day');
-  const title = fd.get('title').toString().trim();
-  const notes = fd.get('notes').toString().trim();
-  if (!title) return;
+// ===================================================================
+//  Q&A ENGINE
+// ===================================================================
 
-  customActivities[idx] = customActivities[idx] || [];
-  customActivities[idx].push({ title, notes });
-  saveCustom();
-  addForm.reset();
-
-  const activeFilter = $('.filter-btn.active')?.dataset.filter || 'all';
-  renderDays(activeFilter);
-});
-
-// ===== Q&A ENGINE (improved) =====
 askForm.addEventListener('submit', (e) => {
   e.preventDefault();
   askAnswer.textContent = answerQuestion(askInput.value);
@@ -839,7 +1331,6 @@ function answerQuestion(raw) {
   const q = raw.toLowerCase().trim();
   if (!q) return 'Ask me about cities, travel days, flexible time, hotels, or suggestions.';
 
-  // How many days/nights in [city]
   if (q.match(/how many|how long|number of/)) {
     const city = findCity(q);
     if (city) {
@@ -855,7 +1346,6 @@ function answerQuestion(raw) {
     return 'The trip is 15 days total (Jun 9-23). Ask about a specific city for details.';
   }
 
-  // What's on day N
   const dayMatch = q.match(/(?:day|#)\s*(\d+)/);
   if (dayMatch && !q.includes('how many')) {
     const dayNum = parseInt(dayMatch[1]);
@@ -869,7 +1359,6 @@ function answerQuestion(raw) {
     return `Day ${dayNum} doesn't exist. The trip is days 1–15.`;
   }
 
-  // Confirmation lookups
   if (q.includes('confirm') || q.includes('reservation') || q.includes('booking number')) {
     const terms = [
       ['flight', 'United'], ['united', 'United'], ['aloft', 'Aloft'], ['ginza', 'Aloft'],
@@ -887,7 +1376,6 @@ function answerQuestion(raw) {
     }).filter(Boolean).join(' | ') || 'No confirmation found for that term.';
   }
 
-  // Check-in / check-out
   if (q.includes('check in') || q.includes('check-in') || q.includes('checkin') || q.includes('check out') || q.includes('checkout')) {
     const city = findCity(q);
     const matchDays = city
@@ -899,7 +1387,6 @@ function answerQuestion(raw) {
     }).join(' | ') || 'No check-in info found.';
   }
 
-  // What hotel in [city]
   if (q.match(/what hotel|where.*stay|where.*sleep|which hotel|hotel in|where.*hotel/)) {
     const city = findCity(q);
     if (city) {
@@ -907,18 +1394,14 @@ function answerQuestion(raw) {
         DAYS.filter(d => d.cityKey === city && d.hotel?.name)
           .map(d => d.hotel.name)
       )];
-      if (hotels.length) {
-        return `In ${CITIES[city].name}: ${hotels.join(', then ')}.`;
-      }
+      if (hotels.length) return `In ${CITIES[city].name}: ${hotels.join(', then ')}.`;
     }
-    // Show all hotels
     const allHotels = BOOKINGS.filter(b => b.icon === 'hotel')
       .map(b => `${b.title} (${b.details.find(([k]) => k === 'Dates')?.[1] || ''})`)
       .join(' | ');
     return allHotels || 'No hotel info found.';
   }
 
-  // Travel / transport
   if (q.includes('leave') || q.includes('transfer') || q.includes('train') || q.includes('flight') || q.includes('shinkansen') || q.includes('travel')) {
     const travelDays = DAYS.filter(d => d.transport.length > 0);
     const city = findCity(q);
@@ -926,14 +1409,12 @@ function answerQuestion(raw) {
     return results.map(d => `${fmtDate.format(parseDate(d.date))}: ${d.transport.slice(0, 2).join(', ')}`).join(' | ') || 'No travel details found.';
   }
 
-  // City query
   const city = findCity(q);
   if (city) {
     const matches = DAYS.filter(d => d.cityKey === city);
     return matches.map(d => `${fmtDate.format(parseDate(d.date))}: ${d.title} — ${d.attractions.slice(0, 3).join(', ')}`).join(' | ') || `No days found for "${city}".`;
   }
 
-  // Flexible / open
   if (q.includes('flex') || q.includes('open') || q.includes('free') || q.includes('buffer')) {
     const flexDays = DAYS.filter(d =>
       d.attractions.some(a => /flexible|pending|add|buffer|optional|free|open/i.test(a)) || d.attractions.length <= 2
@@ -943,22 +1424,18 @@ function answerQuestion(raw) {
       : 'All days currently have planned activities.';
   }
 
-  // Suggest
   if (q.includes('suggest') || q.includes('recommend') || q.includes('idea') || q.includes('kid') || q.includes('tip')) {
     return 'Suggestions: Keep one anchor activity per day plus a flexible backup. In Kyoto, Fushimi Inari is best early morning. Miyajima depends on tides. For rainy days in Tokyo, try TeamLab Borderless or a depachika food hall.';
   }
 
-  // Hotel (generic)
   if (q.includes('hotel') || q.includes('stay') || q.includes('where')) {
     return DAYS.filter(d => d.hotel).map(d => `${fmtDate.format(parseDate(d.date))}: ${d.hotel.name}`).join(' | ');
   }
 
-  // Cost
   if (q.includes('cost') || q.includes('price') || q.includes('budget') || q.includes('spend') || q.includes('money')) {
     return 'Costs: Flights = 805,400 miles + $101.06 | Toranomon Hills = $862.20 | UBUYA = $750.59 | Ace Kyoto = $660.61 | ANA Kobe = $246.40 | Aloft Ginza = 113K pts | Hilton Hiroshima = 177K pts. Total cash: ~$2,519.80 + miles/points.';
   }
 
-  // What / when
   if (q.includes('when') || q.includes('what time') || q.includes('arrive') || q.includes('depart')) {
     if (q.includes('arrive') || q.includes('land')) {
       return 'You arrive in Japan on Jun 10 at 2:55 PM JST (UA 837 into NRT). Airport transfer to Ginza for first hotel.';
@@ -985,19 +1462,20 @@ function findCity(q) {
   return match ? match[1] : null;
 }
 
-// ===== NOTIFICATIONS =====
+// ===================================================================
+//  NOTIFICATIONS
+// ===================================================================
+
 notifyBtn.addEventListener('click', async () => {
   if (!('Notification' in window)) {
     notifyStatus.textContent = 'This browser does not support notifications.';
     return;
   }
-
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') {
     notifyStatus.textContent = 'Notifications were not enabled.';
     return;
   }
-
   notifyStatus.textContent = "Enabled! You'll get reminders for upcoming events.";
   notifyBtn.textContent = 'Enabled';
   notifyBtn.disabled = true;
@@ -1007,7 +1485,6 @@ notifyBtn.addEventListener('click', async () => {
       body: "Reminders are active. You'll be notified before check-ins and travel days.",
     });
   }, 2000);
-
   scheduleUpcoming();
 });
 
@@ -1015,8 +1492,7 @@ function scheduleUpcoming() {
   const now = Date.now();
   DAYS.forEach((day) => {
     const dayDate = parseDate(day.date).getTime();
-    const msAhead = dayDate - now;
-    const notify24h = msAhead - 86400000;
+    const notify24h = dayDate - now - 86400000;
     if (notify24h > 0 && notify24h < 15 * 86400000) {
       setTimeout(() => {
         new Notification(`Tomorrow: ${day.title}`, {
@@ -1031,18 +1507,17 @@ function scheduleUpcoming() {
   });
 }
 
-// ===== MOBILE NAV ACTIVE STATE =====
+// ===================================================================
+//  MOBILE NAV
+// ===================================================================
+
 function updateMobileNav() {
   const sections = ['route', 'itinerary', 'bookings', 'ask'];
   let current = 'route';
-
   for (const id of sections) {
     const el = document.getElementById(id);
-    if (el && el.getBoundingClientRect().top <= 120) {
-      current = id;
-    }
+    if (el && el.getBoundingClientRect().top <= 120) current = id;
   }
-
   $$('.mnav-item').forEach((item) => {
     item.classList.toggle('active', item.dataset.section === current);
   });
@@ -1054,13 +1529,16 @@ window.addEventListener('scroll', () => {
   scrollTimer = setTimeout(updateMobileNav, 60);
 }, { passive: true });
 
-// ===== INIT =====
+// ===================================================================
+//  INIT
+// ===================================================================
+
 renderCityNav();
 renderDays();
 renderBookings();
-renderDayOptions();
 renderCountdown();
 initStickyNav();
+initBulkPaste();
 updateMobileNav();
 
 setInterval(() => {

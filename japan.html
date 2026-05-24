@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body class="is-trip">
 
@@ -91,34 +91,10 @@
       </div>
     </section>
 
-    <!-- Quick Add -->
-    <section class="section add-section" id="add">
-      <div class="container">
-        <div class="add-card">
-          <div class="section-intro">
-            <span class="label">Quick Add</span>
-            <h2>Add an activity</h2>
-          </div>
-          <form class="add-form" id="add-form">
-            <div class="form-row">
-              <label>
-                <span>Day</span>
-                <select id="add-day" name="day" required></select>
-              </label>
-              <label class="form-grow">
-                <span>Activity</span>
-                <input id="add-title" name="title" type="text" placeholder="Temple visit, dinner, museum..." required>
-              </label>
-            </div>
-            <label>
-              <span>Notes (optional)</span>
-              <textarea id="add-notes" name="notes" rows="2" placeholder="Time, neighborhood, booking link..."></textarea>
-            </label>
-            <button type="submit" class="btn btn-primary">Add to itinerary</button>
-          </form>
-        </div>
-      </div>
-    </section>
+    <!-- Bulk Add Button (floating) -->
+    <div class="bulk-trigger">
+      <button id="bulk-open-btn" class="btn btn-primary">📋 Bulk Add Activities</button>
+    </div>
 
     <!-- Ask -->
     <section class="section ask-section" id="ask">
@@ -179,6 +155,27 @@
     </a>
   </nav>
 
-  <script src="app.js"></script>
+  <!-- Bulk Paste Modal -->
+  <div class="bulk-modal" id="bulk-modal">
+    <div class="bulk-content">
+      <div class="bulk-header">
+        <h3>Bulk Add Activities</h3>
+        <button class="bulk-close-btn" id="bulk-close">×</button>
+      </div>
+      <p class="bulk-desc">Paste activities, one per line. Format: <code>Day 6 8:15am Shinkansen to Kyoto</code></p>
+      <form id="bulk-form">
+        <textarea id="bulk-text" rows="8" placeholder="Day 6 8:15am Shinkansen to Kyoto&#10;Day 7 Fushimi Inari&#10;Day 8 Dinner in Gion&#10;Day 10 3pm Kobe Beef at Steakland"></textarea>
+        <div id="bulk-preview" class="bulk-preview">
+          <p class="bulk-hint">Enter activities above to see preview</p>
+        </div>
+        <div class="bulk-actions">
+          <button type="submit" class="btn btn-primary">Add All</button>
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('bulk-modal').classList.remove('open')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js?v=4"></script>
 </body>
 </html>
