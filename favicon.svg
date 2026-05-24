@@ -1,15 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="102" fill="#1c183a"/>
-  <!-- Origin dot (gold/amber) -->
-  <circle cx="175" cy="108" r="16" fill="#d4a44a"/>
-  <!-- Winding path (cream) - gentle vertical meander -->
-  <path d="M 175 108
-           C 185 95, 250 85, 300 120
-           C 350 155, 310 210, 255 240
-           C 200 270, 195 310, 225 350
-           C 255 390, 310 395, 335 388"
-        stroke="#e8dcc8" stroke-width="22" fill="none"
+  <rect width="512" height="512" rx="102" fill="#e8a820"/>
+  <!-- Origin dot -->
+  <circle cx="155" cy="125" r="20" fill="#fff"/>
+  <circle cx="155" cy="125" r="12" fill="#1c183a"/>
+  <!-- Winding path (dark navy) -->
+  <path d="M 155 125
+           C 170 100, 290 80, 350 140
+           C 410 200, 280 240, 210 270
+           C 140 300, 170 370, 260 390
+           C 310 400, 350 380, 365 370"
+        stroke="#1c183a" stroke-width="28" fill="none"
         stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Destination dot (terracotta/rust) -->
-  <circle cx="335" cy="388" r="16" fill="#c45a2c"/>
+  <!-- Destination dot -->
+  <circle cx="365" cy="370" r="20" fill="#fff"/>
+  <circle cx="365" cy="370" r="12" fill="#1c183a"/>
 </svg>

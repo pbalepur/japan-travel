@@ -121,6 +121,36 @@ img { display: block; max-width: 100%; }
   text-align: center;
 }
 
+.brand-icon {
+  display: inline-block;
+  border-radius: 20%;
+  flex-shrink: 0;
+}
+
+.brand-icon-lg {
+  width: 56px;
+  height: 56px;
+}
+
+.brand-icon-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 22%;
+}
+
+.brand-icon-hero {
+  width: 24px;
+  height: 24px;
+  border-radius: 22%;
+}
+
+.landing-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
 .landing-logo {
   margin: 0;
   font-family: var(--font-serif);
@@ -333,6 +363,9 @@ img { display: block; max-width: 100%; }
 }
 
 .sticky-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--font-serif);
   font-size: 1.3rem;
   font-weight: 500;
