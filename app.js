@@ -35,6 +35,7 @@ const ICONS = {
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>',
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
 };
 
 // ===================================================================
@@ -1120,17 +1121,18 @@ function renderBookings() {
   const bookingGrid = $('#booking-grid');
   if (!bookingGrid) return;
 
-  bookingGrid.innerHTML = trip.bookings.map((b) => {
+  bookingGrid.innerHTML = trip.bookings.map((b, idx) => {
     const place = trip.places[b.colorKey] || trip.places.transit;
     const icon = ICONS[b.icon] || ICONS.hotel;
     return `
-      <article class="booking-card" style="--booking-color:${place.color}; --booking-color-bg:${place.bg}">
+      <article class="booking-card" data-booking-idx="${idx}" style="--booking-color:${place.color}; --booking-color-bg:${place.bg}">
         <div class="booking-card-header">
           <div class="booking-icon">${icon}</div>
           <div>
             <span class="booking-type">${b.type}</span>
             <h3>${b.title}</h3>
           </div>
+          <button class="booking-edit-btn" data-idx="${idx}" title="Edit booking">${ICONS.edit}</button>
         </div>
         <div class="booking-card-body">
           <dl>${b.details.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
@@ -1140,6 +1142,102 @@ function renderBookings() {
         </div>
       </article>`;
   }).join('');
+
+  // Attach edit handlers
+  bookingGrid.querySelectorAll('.booking-edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      openBookingEditor(idx);
+    });
+  });
+}
+
+function openBookingEditor(idx) {
+  const booking = trip.bookings[idx];
+  if (!booking) return;
+
+  // Check if already editing
+  const card = $(`.booking-card[data-booking-idx="${idx}"]`);
+  if (!card || card.querySelector('.booking-edit-form')) return;
+
+  // Snapshot for undo
+  const snapshot = JSON.parse(JSON.stringify(booking));
+
+  const body = card.querySelector('.booking-card-body');
+  const footer = card.querySelector('.booking-card-footer');
+  body.style.display = 'none';
+  footer.style.display = 'none';
+
+  const form = document.createElement('form');
+  form.className = 'booking-edit-form';
+
+  // Title field
+  let fields = `
+    <div class="bef-field">
+      <label>Title</label>
+      <input type="text" name="title" value="${escHtml(booking.title)}" required>
+    </div>`;
+
+  // Detail fields
+  booking.details.forEach(([key, val], i) => {
+    fields += `
+      <div class="bef-field">
+        <label>${escHtml(key)}</label>
+        <input type="text" name="detail_${i}" value="${escHtml(val)}">
+      </div>`;
+  });
+
+  // URL field
+  fields += `
+    <div class="bef-field">
+      <label>URL</label>
+      <input type="url" name="url" value="${escHtml(booking.url || '')}" placeholder="https://...">
+    </div>`;
+
+  form.innerHTML = `
+    ${fields}
+    <div class="bef-actions">
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+      <button type="button" class="btn btn-outline btn-sm bef-cancel">Cancel</button>
+    </div>`;
+
+  body.after(form);
+  form.querySelector('input[name="title"]').focus();
+
+  form.querySelector('.bef-cancel').addEventListener('click', () => {
+    form.remove();
+    body.style.display = '';
+    footer.style.display = '';
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+
+    // Apply changes
+    booking.title = fd.get('title').toString().trim();
+    booking.url = fd.get('url')?.toString().trim() || '';
+    booking.details.forEach(([key], i) => {
+      const val = fd.get(`detail_${i}`)?.toString().trim() || '';
+      booking.details[i][1] = val;
+    });
+
+    saveTrip();
+    renderBookings();
+
+    showUndoToast('Booking updated', () => {
+      trip.bookings[idx] = snapshot;
+      saveTrip();
+      renderBookings();
+    });
+  });
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
 }
 
 // ===================================================================

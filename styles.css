@@ -1213,6 +1213,64 @@ img { display: block; max-width: 100%; }
 
 .booking-card-footer a:hover { opacity: .7; }
 
+/* Booking edit button */
+.booking-edit-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 6px;
+  border-radius: 6px;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.booking-edit-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.booking-edit-btn:hover {
+  color: var(--ink);
+  background: var(--bg-section);
+}
+
+/* Booking edit form */
+.booking-edit-form {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+}
+.bef-field {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.bef-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bef-field input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.84rem;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+}
+.bef-field input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+.bef-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
 .booking-card-footer a svg {
   width: 14px;
   height: 14px;
