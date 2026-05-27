@@ -1170,36 +1170,100 @@ img { display: block; max-width: 100%; }
   letter-spacing: 0.04em;
 }
 
+/* Booking card body */
 .booking-card-body {
   padding: 14px 18px;
 }
 
-.booking-card-body dl {
+/* Structured DL for key-value pairs */
+.booking-dl {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 6px 14px;
   margin: 0;
   font-size: 0.85rem;
 }
-
-.booking-card-body dt {
+.booking-dl dt {
   color: var(--ink-muted);
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-
-.booking-card-body dd {
+.booking-dl dd {
   margin: 0;
   color: var(--ink);
 }
+.booking-mono {
+  font-family: var(--font-mono, 'SF Mono', 'Fira Code', monospace);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+.booking-nights {
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+}
 
+/* Flight legs */
+.booking-flights {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.booking-flight-leg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.booking-flight-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+}
+.booking-flight-route {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.booking-flight-detail {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+/* Rail legs */
+.booking-rail-legs {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+.booking-rail-legs li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.booking-rail-date {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  min-width: 90px;
+}
+
+/* Booking card footer */
 .booking-card-footer {
   padding: 12px 18px;
   border-top: 1px solid var(--border-light);
 }
-
+.booking-card-footer:empty {
+  display: none;
+}
 .booking-card-footer a {
   display: inline-flex;
   align-items: center;
@@ -1210,8 +1274,11 @@ img { display: block; max-width: 100%; }
   text-decoration: none;
   transition: opacity var(--transition);
 }
-
 .booking-card-footer a:hover { opacity: .7; }
+.booking-card-footer a svg {
+  width: 14px;
+  height: 14px;
+}
 
 /* Booking edit button */
 .booking-edit-btn {
@@ -1225,34 +1292,34 @@ img { display: block; max-width: 100%; }
   transition: all var(--transition);
   flex-shrink: 0;
 }
-.booking-edit-btn svg {
-  width: 16px;
-  height: 16px;
-}
+.booking-edit-btn svg { width: 16px; height: 16px; }
 .booking-edit-btn:hover {
   color: var(--ink);
   background: var(--bg-section);
 }
 
-/* Booking edit form */
+/* Booking edit form — structured */
 .booking-edit-form {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px 18px;
 }
 .bef-field {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 8px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .bef-field label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
-.bef-field input {
-  padding: 7px 10px;
+.bef-field input,
+.bef-field textarea {
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.84rem;
@@ -1260,20 +1327,85 @@ img { display: block; max-width: 100%; }
   background: var(--bg);
   color: var(--ink);
   width: 100%;
+  box-sizing: border-box;
 }
-.bef-field input:focus {
+.bef-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+.bef-field input:focus,
+.bef-field textarea:focus {
   outline: none;
   border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(212,175,55,.15);
 }
+.bef-readonly {
+  background: var(--bg-section) !important;
+  color: var(--ink-muted) !important;
+  cursor: default;
+}
+.bef-row {
+  display: flex;
+  gap: 10px;
+}
+.bef-row .bef-field { flex: 1; min-width: 0; }
+.bef-field-sm { max-width: 80px; flex: 0 0 80px !important; }
+.bef-field-grow { flex: 2 !important; }
 .bef-actions {
   display: flex;
   gap: 8px;
-  padding-top: 4px;
+  padding-top: 6px;
 }
 
-.booking-card-footer a svg {
-  width: 14px;
-  height: 14px;
+/* Flight leg fieldset */
+.bef-leg {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bef-leg legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  padding: 0 6px;
+}
+
+/* Rail leg rows */
+.bef-leg-row {
+  align-items: center;
+}
+.bef-leg-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.bef-add-leg {
+  margin-top: 6px;
+}
+.bef-legs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Mobile tweaks for booking forms */
+@media (max-width: 480px) {
+  .bef-row { flex-direction: column; gap: 8px; }
+  .bef-field-sm { max-width: none; flex: 1 !important; }
+  .bef-leg { padding: 10px; }
+  .booking-flights { gap: 12px; }
 }
 
 /* ===== FORMS ===== */

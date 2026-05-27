@@ -1117,6 +1117,83 @@ function deletePlaceConfirm(placeKey) {
 //  RENDER: Bookings
 // ===================================================================
 
+function calcNights(checkIn, checkOut) {
+  if (!checkIn || !checkOut) return null;
+  const a = new Date(checkIn + 'T00:00:00');
+  const b = new Date(checkOut + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+
+function fmtBookingDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function fmtTime12(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 || 12;
+  return `${hh}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function renderBookingBody(b) {
+  if (b.category === 'hotel') {
+    const nights = calcNights(b.checkIn, b.checkOut);
+    const nightsLabel = nights ? `${nights} night${nights > 1 ? 's' : ''}` : '';
+    const firstNoteLine = (b.notes || '').split('\n')[0];
+    return `
+      <dl class="booking-dl">
+        <dt>Dates</dt><dd>${fmtBookingDate(b.checkIn)} → ${fmtBookingDate(b.checkOut)}${nightsLabel ? ` <span class="booking-nights">(${nightsLabel})</span>` : ''}</dd>
+        ${b.confirmation ? `<dt>Confirmation</dt><dd class="booking-mono">${escHtml(b.confirmation)}</dd>` : ''}
+        ${b.cost ? `<dt>Cost</dt><dd>${escHtml(b.cost)}</dd>` : ''}
+        ${firstNoteLine ? `<dt>Room</dt><dd>${escHtml(firstNoteLine)}</dd>` : ''}
+      </dl>`;
+  }
+
+  if (b.category === 'flight') {
+    const renderLeg = (leg, label) => {
+      if (!leg) return '';
+      return `
+        <div class="booking-flight-leg">
+          <span class="booking-flight-label">${label}</span>
+          <span class="booking-flight-route">${leg.departAirport} → ${leg.arriveAirport}</span>
+          <span class="booking-flight-detail">${leg.flight} · ${fmtBookingDate(leg.departDate)} · ${fmtTime12(leg.departTime)} – ${fmtTime12(leg.arriveTime)}${leg.arriveDate !== leg.departDate ? ' (+1)' : ''}</span>
+        </div>`;
+    };
+    return `
+      <div class="booking-flights">
+        ${renderLeg(b.outbound, 'Outbound')}
+        ${renderLeg(b.inbound, 'Return')}
+      </div>
+      <dl class="booking-dl">
+        ${b.confirmation ? `<dt>Confirmation</dt><dd class="booking-mono">${escHtml(b.confirmation)}</dd>` : ''}
+        ${b.cost ? `<dt>Cost</dt><dd>${escHtml(b.cost)}</dd>` : ''}
+        ${b.notes ? `<dt>Aircraft</dt><dd>${escHtml(b.notes)}</dd>` : ''}
+      </dl>`;
+  }
+
+  if (b.category === 'rail') {
+    const legItems = (b.legs || []).map(l =>
+      `<li><span class="booking-rail-date">${fmtBookingDate(l.date)}</span> ${escHtml(l.route)}</li>`
+    ).join('');
+    return `
+      <ul class="booking-rail-legs">${legItems}</ul>
+      <dl class="booking-dl">
+        ${b.confirmation ? `<dt>Confirmation</dt><dd class="booking-mono">${escHtml(b.confirmation)}</dd>` : ''}
+        ${b.cost ? `<dt>Cost</dt><dd>${escHtml(b.cost)}</dd>` : ''}
+      </dl>`;
+  }
+
+  // Fallback for unknown categories
+  return `<dl class="booking-dl">
+    ${b.confirmation ? `<dt>Confirmation</dt><dd class="booking-mono">${escHtml(b.confirmation)}</dd>` : ''}
+    ${b.cost ? `<dt>Cost</dt><dd>${escHtml(b.cost)}</dd>` : ''}
+    ${b.notes ? `<dt>Notes</dt><dd>${escHtml(b.notes)}</dd>` : ''}
+  </dl>`;
+}
+
 function renderBookings() {
   const bookingGrid = $('#booking-grid');
   if (!bookingGrid) return;
@@ -1124,21 +1201,22 @@ function renderBookings() {
   bookingGrid.innerHTML = trip.bookings.map((b, idx) => {
     const place = trip.places[b.colorKey] || trip.places.transit;
     const icon = ICONS[b.icon] || ICONS.hotel;
+    const categoryLabel = b.category === 'flight' ? 'Flight' : b.category === 'rail' ? 'Rail' : 'Hotel';
     return `
       <article class="booking-card" data-booking-idx="${idx}" style="--booking-color:${place.color}; --booking-color-bg:${place.bg}">
         <div class="booking-card-header">
           <div class="booking-icon">${icon}</div>
           <div>
-            <span class="booking-type">${b.type}</span>
-            <h3>${b.title}</h3>
+            <span class="booking-type">${categoryLabel}</span>
+            <h3>${escHtml(b.title)}</h3>
           </div>
           <button class="booking-edit-btn" data-idx="${idx}" title="Edit booking">${ICONS.edit}</button>
         </div>
         <div class="booking-card-body">
-          <dl>${b.details.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+          ${renderBookingBody(b)}
         </div>
         <div class="booking-card-footer">
-          <a href="${b.url}" target="_blank" rel="noreferrer">View details ${ICONS.arrow}</a>
+          ${b.url ? `<a href="${escHtml(b.url)}" target="_blank" rel="noreferrer">View details ${ICONS.arrow}</a>` : ''}
         </div>
       </article>`;
   }).join('');
@@ -1151,6 +1229,161 @@ function renderBookings() {
       openBookingEditor(idx);
     });
   });
+}
+
+// ===================================================================
+//  Booking Editor — Structured Forms
+// ===================================================================
+
+function buildHotelForm(b) {
+  return `
+    <div class="bef-field">
+      <label>Hotel name</label>
+      <input type="text" name="title" value="${escHtml(b.title)}" required>
+    </div>
+    <div class="bef-row">
+      <div class="bef-field">
+        <label>Check-in</label>
+        <input type="date" name="checkIn" value="${b.checkIn || ''}" required>
+      </div>
+      <div class="bef-field">
+        <label>Check-out</label>
+        <input type="date" name="checkOut" value="${b.checkOut || ''}" required>
+      </div>
+      <div class="bef-field bef-field-sm">
+        <label>Nights</label>
+        <input type="text" name="_nights" value="${calcNights(b.checkIn, b.checkOut) || ''}" readonly class="bef-readonly">
+      </div>
+    </div>
+    <div class="bef-row">
+      <div class="bef-field">
+        <label>Confirmation</label>
+        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}">
+      </div>
+      <div class="bef-field">
+        <label>Cost</label>
+        <input type="text" name="cost" value="${escHtml(b.cost || '')}">
+      </div>
+    </div>
+    <div class="bef-field">
+      <label>Notes</label>
+      <textarea name="notes" rows="3" placeholder="Room type, address, phone...">${escHtml(b.notes || '')}</textarea>
+    </div>
+    <div class="bef-field">
+      <label>URL</label>
+      <input type="url" name="url" value="${escHtml(b.url || '')}" placeholder="https://...">
+    </div>`;
+}
+
+function buildFlightForm(b) {
+  const legFields = (leg, prefix, label) => {
+    if (!leg) leg = {};
+    return `
+    <fieldset class="bef-leg">
+      <legend>${label}</legend>
+      <div class="bef-row">
+        <div class="bef-field">
+          <label>Flight</label>
+          <input type="text" name="${prefix}_flight" value="${escHtml(leg.flight || '')}" placeholder="UA 837">
+        </div>
+        <div class="bef-field">
+          <label>From</label>
+          <input type="text" name="${prefix}_departAirport" value="${escHtml(leg.departAirport || '')}" placeholder="SFO" maxlength="4">
+        </div>
+        <div class="bef-field">
+          <label>To</label>
+          <input type="text" name="${prefix}_arriveAirport" value="${escHtml(leg.arriveAirport || '')}" placeholder="NRT" maxlength="4">
+        </div>
+      </div>
+      <div class="bef-row">
+        <div class="bef-field">
+          <label>Depart date</label>
+          <input type="date" name="${prefix}_departDate" value="${leg.departDate || ''}">
+        </div>
+        <div class="bef-field">
+          <label>Depart time</label>
+          <input type="time" name="${prefix}_departTime" value="${leg.departTime || ''}">
+        </div>
+      </div>
+      <div class="bef-row">
+        <div class="bef-field">
+          <label>Arrive date</label>
+          <input type="date" name="${prefix}_arriveDate" value="${leg.arriveDate || ''}">
+        </div>
+        <div class="bef-field">
+          <label>Arrive time</label>
+          <input type="time" name="${prefix}_arriveTime" value="${leg.arriveTime || ''}">
+        </div>
+      </div>
+    </fieldset>`;
+  };
+  return `
+    <div class="bef-field">
+      <label>Title</label>
+      <input type="text" name="title" value="${escHtml(b.title)}" required>
+    </div>
+    ${legFields(b.outbound, 'out', 'Outbound')}
+    ${legFields(b.inbound, 'in', 'Return')}
+    <div class="bef-row">
+      <div class="bef-field">
+        <label>Confirmation</label>
+        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}">
+      </div>
+      <div class="bef-field">
+        <label>Cost</label>
+        <input type="text" name="cost" value="${escHtml(b.cost || '')}">
+      </div>
+    </div>
+    <div class="bef-field">
+      <label>Notes</label>
+      <textarea name="notes" rows="2" placeholder="Aircraft, class...">${escHtml(b.notes || '')}</textarea>
+    </div>
+    <div class="bef-field">
+      <label>URL</label>
+      <input type="url" name="url" value="${escHtml(b.url || '')}" placeholder="https://...">
+    </div>`;
+}
+
+function buildRailForm(b) {
+  const legRows = (b.legs || []).map((l, i) => `
+    <div class="bef-row bef-leg-row" data-leg-idx="${i}">
+      <div class="bef-field">
+        <input type="date" name="leg_date_${i}" value="${l.date || ''}">
+      </div>
+      <div class="bef-field bef-field-grow">
+        <input type="text" name="leg_route_${i}" value="${escHtml(l.route || '')}" placeholder="City A → City B">
+      </div>
+      <button type="button" class="bef-leg-remove btn btn-outline btn-xs" data-leg="${i}" title="Remove">×</button>
+    </div>`).join('');
+
+  return `
+    <div class="bef-field">
+      <label>Title</label>
+      <input type="text" name="title" value="${escHtml(b.title)}" required>
+    </div>
+    <div class="bef-field">
+      <label>Legs</label>
+      <div class="bef-legs-list" id="bef-legs-list">${legRows}</div>
+      <button type="button" class="btn btn-outline btn-xs bef-add-leg">+ Add leg</button>
+    </div>
+    <div class="bef-row">
+      <div class="bef-field">
+        <label>Confirmation</label>
+        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}">
+      </div>
+      <div class="bef-field">
+        <label>Cost</label>
+        <input type="text" name="cost" value="${escHtml(b.cost || '')}">
+      </div>
+    </div>
+    <div class="bef-field">
+      <label>Notes</label>
+      <textarea name="notes" rows="2">${escHtml(b.notes || '')}</textarea>
+    </div>
+    <div class="bef-field">
+      <label>URL</label>
+      <input type="url" name="url" value="${escHtml(b.url || '')}" placeholder="https://...">
+    </div>`;
 }
 
 function openBookingEditor(idx) {
@@ -1172,28 +1405,11 @@ function openBookingEditor(idx) {
   const form = document.createElement('form');
   form.className = 'booking-edit-form';
 
-  // Title field
-  let fields = `
-    <div class="bef-field">
-      <label>Title</label>
-      <input type="text" name="title" value="${escHtml(booking.title)}" required>
-    </div>`;
-
-  // Detail fields
-  booking.details.forEach(([key, val], i) => {
-    fields += `
-      <div class="bef-field">
-        <label>${escHtml(key)}</label>
-        <input type="text" name="detail_${i}" value="${escHtml(val)}">
-      </div>`;
-  });
-
-  // URL field
-  fields += `
-    <div class="bef-field">
-      <label>URL</label>
-      <input type="url" name="url" value="${escHtml(booking.url || '')}" placeholder="https://...">
-    </div>`;
+  let fields = '';
+  if (booking.category === 'hotel') fields = buildHotelForm(booking);
+  else if (booking.category === 'flight') fields = buildFlightForm(booking);
+  else if (booking.category === 'rail') fields = buildRailForm(booking);
+  else fields = buildHotelForm(booking); // fallback
 
   form.innerHTML = `
     ${fields}
@@ -1205,23 +1421,95 @@ function openBookingEditor(idx) {
   body.after(form);
   form.querySelector('input[name="title"]').focus();
 
+  // Auto-calc nights when dates change (hotel)
+  if (booking.category === 'hotel') {
+    const ciInput = form.querySelector('input[name="checkIn"]');
+    const coInput = form.querySelector('input[name="checkOut"]');
+    const nightsInput = form.querySelector('input[name="_nights"]');
+    const updateNights = () => {
+      const n = calcNights(ciInput.value, coInput.value);
+      nightsInput.value = n > 0 ? n : '';
+    };
+    ciInput.addEventListener('change', updateNights);
+    coInput.addEventListener('change', updateNights);
+  }
+
+  // Rail: add/remove legs
+  if (booking.category === 'rail') {
+    const legsList = form.querySelector('#bef-legs-list');
+    form.querySelector('.bef-add-leg').addEventListener('click', () => {
+      const i = legsList.children.length;
+      const row = document.createElement('div');
+      row.className = 'bef-row bef-leg-row';
+      row.dataset.legIdx = i;
+      row.innerHTML = `
+        <div class="bef-field">
+          <input type="date" name="leg_date_${i}" value="">
+        </div>
+        <div class="bef-field bef-field-grow">
+          <input type="text" name="leg_route_${i}" value="" placeholder="City A → City B">
+        </div>
+        <button type="button" class="bef-leg-remove btn btn-outline btn-xs" data-leg="${i}" title="Remove">×</button>`;
+      legsList.appendChild(row);
+    });
+    legsList.addEventListener('click', (e) => {
+      if (e.target.classList.contains('bef-leg-remove')) {
+        e.target.closest('.bef-leg-row').remove();
+      }
+    });
+  }
+
+  // Cancel
   form.querySelector('.bef-cancel').addEventListener('click', () => {
     form.remove();
     body.style.display = '';
     footer.style.display = '';
   });
 
+  // Submit
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(form);
 
-    // Apply changes
     booking.title = fd.get('title').toString().trim();
     booking.url = fd.get('url')?.toString().trim() || '';
-    booking.details.forEach(([key], i) => {
-      const val = fd.get(`detail_${i}`)?.toString().trim() || '';
-      booking.details[i][1] = val;
-    });
+    booking.confirmation = fd.get('confirmation')?.toString().trim() || '';
+    booking.cost = fd.get('cost')?.toString().trim() || '';
+    booking.notes = fd.get('notes')?.toString().trim() || '';
+
+    if (booking.category === 'hotel') {
+      booking.checkIn = fd.get('checkIn') || '';
+      booking.checkOut = fd.get('checkOut') || '';
+      syncBookingToStays(booking);
+    } else if (booking.category === 'flight') {
+      booking.outbound = {
+        flight: fd.get('out_flight')?.toString().trim() || '',
+        departAirport: fd.get('out_departAirport')?.toString().trim().toUpperCase() || '',
+        arriveAirport: fd.get('out_arriveAirport')?.toString().trim().toUpperCase() || '',
+        departDate: fd.get('out_departDate') || '',
+        departTime: fd.get('out_departTime') || '',
+        arriveDate: fd.get('out_arriveDate') || '',
+        arriveTime: fd.get('out_arriveTime') || '',
+      };
+      booking.inbound = {
+        flight: fd.get('in_flight')?.toString().trim() || '',
+        departAirport: fd.get('in_departAirport')?.toString().trim().toUpperCase() || '',
+        arriveAirport: fd.get('in_arriveAirport')?.toString().trim().toUpperCase() || '',
+        departDate: fd.get('in_departDate') || '',
+        departTime: fd.get('in_departTime') || '',
+        arriveDate: fd.get('in_arriveDate') || '',
+        arriveTime: fd.get('in_arriveTime') || '',
+      };
+    } else if (booking.category === 'rail') {
+      const legRows = form.querySelectorAll('.bef-leg-row');
+      booking.legs = [];
+      legRows.forEach(row => {
+        const i = row.dataset.legIdx;
+        const date = fd.get(`leg_date_${i}`)?.toString() || '';
+        const route = fd.get(`leg_route_${i}`)?.toString().trim() || '';
+        if (date || route) booking.legs.push({ date, route });
+      });
+    }
 
     saveTrip();
     renderBookings();
@@ -1230,7 +1518,30 @@ function openBookingEditor(idx) {
       trip.bookings[idx] = snapshot;
       saveTrip();
       renderBookings();
+      // Re-sync stays with old data
+      if (snapshot.category === 'hotel') syncBookingToStays(snapshot);
     });
+  });
+}
+
+// Sync hotel booking dates/name to matching day.stay entries
+function syncBookingToStays(hotelBooking) {
+  if (hotelBooking.category !== 'hotel') return;
+  const ci = hotelBooking.checkIn;
+  const co = hotelBooking.checkOut;
+  if (!ci || !co) return;
+
+  trip.days.forEach(day => {
+    const dayDate = day.date;
+    // Day falls within this hotel stay (check-in date up to but not including check-out)
+    if (dayDate >= ci && dayDate < co) {
+      day.stay = day.stay || {};
+      day.stay.hotel = hotelBooking.title;
+      day.stay.confirmation = hotelBooking.confirmation || '';
+      // First line of notes is typically room type
+      const firstNote = (hotelBooking.notes || '').split('\n')[0];
+      if (firstNote) day.stay.room = firstNote;
+    }
   });
 }
 
@@ -1698,6 +2009,39 @@ async function init() {
       document.body.innerHTML = '<div style="padding:40px;text-align:center"><h2>Failed to load trip data</h2><p>Could not fetch trip.json</p></div>';
       return;
     }
+  }
+
+  // Migrate bookings from old details-array format to structured schema
+  if (trip.bookings?.length && trip.bookings[0].details && !trip.bookings[0].category) {
+    trip.bookings = trip.bookings.map(b => {
+      const detailMap = {};
+      (b.details || []).forEach(([k, v]) => { detailMap[k] = v; });
+
+      const base = {
+        icon: b.icon || 'hotel',
+        title: b.title || '',
+        colorKey: b.colorKey || 'transit',
+        confirmation: detailMap['Confirmation'] || detailMap['Conf'] || '',
+        cost: detailMap['Cost'] || detailMap['Points'] || '',
+        notes: detailMap['Room'] || detailMap['Notes'] || '',
+        url: b.url || '',
+      };
+
+      const typeLower = (b.type || '').toLowerCase();
+      if (typeLower === 'flight') {
+        return { ...base, category: 'flight', outbound: {}, inbound: {} };
+      } else if (typeLower === 'rail' || typeLower === 'train') {
+        return { ...base, category: 'rail', legs: [] };
+      } else {
+        return {
+          ...base,
+          category: 'hotel',
+          checkIn: detailMap['Check-in'] || '',
+          checkOut: detailMap['Check-out'] || '',
+        };
+      }
+    });
+    saveTrip();
   }
 
   userEdits = loadEdits();

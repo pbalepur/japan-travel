@@ -422,120 +422,120 @@
   ],
   "bookings": [
     {
-      "type": "Flight", "icon": "plane",
+      "category": "flight",
+      "icon": "plane",
       "title": "United SFO ↔ NRT",
       "colorKey": "transit",
-      "details": [
-        ["Confirmation", "HC68FX"],
-        ["Outbound", "UA 837 · Jun 9, 12:20 PM PDT"],
-        ["Arrival", "Jun 10, 2:55 PM JST"],
-        ["Return", "UA 838 · Jun 23, 5:25 PM JST"],
-        ["Home", "Jun 23, 11:00 AM PDT"],
-        ["Aircraft", "Boeing 777-300ER"],
-        ["Class", "United Polaris"],
-        ["Cost", "805,400 miles + $101.06"]
-      ],
+      "confirmation": "HC68FX",
+      "cost": "805,400 miles + $101.06",
+      "outbound": {
+        "flight": "UA 837",
+        "departDate": "2026-06-09",
+        "departTime": "12:20",
+        "departAirport": "SFO",
+        "arriveDate": "2026-06-10",
+        "arriveTime": "14:55",
+        "arriveAirport": "NRT"
+      },
+      "inbound": {
+        "flight": "UA 838",
+        "departDate": "2026-06-23",
+        "departTime": "17:25",
+        "departAirport": "NRT",
+        "arriveDate": "2026-06-23",
+        "arriveTime": "11:00",
+        "arriveAirport": "SFO"
+      },
+      "notes": "Boeing 777-300ER · United Polaris",
       "url": "https://www.united.com/en/us/manageres/mytrips"
     },
     {
-      "type": "Hotel · Tokyo", "icon": "hotel",
+      "category": "hotel",
+      "icon": "hotel",
       "title": "Aloft by Marriott Tokyo Ginza",
       "colorKey": "tokyo",
-      "details": [
-        ["Confirmation", "73477725"],
-        ["Dates", "Jun 10–12 (2 nights)"],
-        ["Check in/out", "3:00 PM / 12:00 PM"],
-        ["Room", "Guest Room, 1 King"],
-        ["Address", "6-14-3 Ginza, Chuo-ku, Tokyo"],
-        ["Phone", "+81-3-6278-8122"],
-        ["Cost", "113,000 Marriott points"]
-      ],
+      "confirmation": "73477725",
+      "checkIn": "2026-06-10",
+      "checkOut": "2026-06-12",
+      "cost": "113,000 Marriott points",
+      "notes": "Guest Room, 1 King\n6-14-3 Ginza, Chuo-ku, Tokyo\n+81-3-6278-8122\nCheck-in 3:00 PM / Check-out 12:00 PM",
       "url": "https://www.marriott.com/en-us/hotels/tyoal-aloft-tokyo-ginza/overview/"
     },
     {
-      "type": "Hotel · Tokyo", "icon": "hotel",
+      "category": "hotel",
+      "icon": "hotel",
       "title": "Hotel Toranomon Hills",
       "colorKey": "tokyo",
-      "details": [
-        ["Confirmation", "9092720951162"],
-        ["Dates", "Jun 12–14 (2 nights)"],
-        ["Check in/out", "3:00 PM / 12:00 PM"],
-        ["Room", "Tower View, Shower, 1 King Bed"],
-        ["Address", "2-6-4 Toranomon, Tokyo"],
-        ["Phone", "+81-3-6834-5678"],
-        ["Cost", "$862.20"]
-      ],
+      "confirmation": "9092720951162",
+      "checkIn": "2026-06-12",
+      "checkOut": "2026-06-14",
+      "cost": "$862.20",
+      "notes": "Tower View, Shower, 1 King Bed\n2-6-4 Toranomon, Tokyo\n+81-3-6834-5678\nCheck-in 3:00 PM / Check-out 12:00 PM",
       "url": "https://www.hyatt.com/unbound-collection/en-US/tyoub-hotel-toranomon-hills"
     },
     {
-      "type": "Hotel · Mt. Fuji", "icon": "hotel",
+      "category": "hotel",
+      "icon": "hotel",
       "title": "UBUYA",
       "colorKey": "fuji",
-      "details": [
-        ["Confirmation", "T790A13DD9795"],
-        ["Dates", "Jun 14–15 (1 night)"],
-        ["Check in/out", "3:00 PM / 11:00 AM"],
-        ["Room", "Deluxe, Open-Air Bath, 90sqm, Mt. Fuji View"],
-        ["Address", "10 Asakawa, Fujikawaguchiko-cho"],
-        ["Phone", "0555-72-1145"],
-        ["Cost", "$750.59 (non-refundable)"]
-      ],
+      "confirmation": "T790A13DD9795",
+      "checkIn": "2026-06-14",
+      "checkOut": "2026-06-15",
+      "cost": "$750.59 (non-refundable)",
+      "notes": "Deluxe, Open-Air Bath, 90sqm, Mt. Fuji View\n10 Asakawa, Fujikawaguchiko-cho\n0555-72-1145\nCheck-in 3:00 PM / Check-out 11:00 AM",
       "url": "https://www.ubuya.co.jp/en/"
     },
     {
-      "type": "Hotel · Kyoto", "icon": "hotel",
+      "category": "hotel",
+      "icon": "hotel",
       "title": "Ace Hotel Kyoto",
       "colorKey": "kyoto",
-      "details": [
-        ["Confirmation", "9146SG486666"],
-        ["Dates", "Jun 15–17 (2 nights)"],
-        ["Check in/out", "3:00 PM / 12:00 PM"],
-        ["Room", "Standard King"],
-        ["Address", "245-2 Kurumaya-cho, Nakagyo-ku, Kyoto"],
-        ["Cost", "$660.61"]
-      ],
+      "confirmation": "9146SG486666",
+      "checkIn": "2026-06-15",
+      "checkOut": "2026-06-17",
+      "cost": "$660.61",
+      "notes": "Standard King\n245-2 Kurumaya-cho, Nakagyo-ku, Kyoto\nCheck-in 3:00 PM / Check-out 12:00 PM",
       "url": "https://acehotel.com/kyoto/"
     },
     {
-      "type": "Hotel · Kobe", "icon": "hotel",
+      "category": "hotel",
+      "icon": "hotel",
       "title": "ANA Crowne Plaza Kobe",
       "colorKey": "kobe",
-      "details": [
-        ["Confirmation", "2462970815"],
-        ["Dates", "Jun 17–19 (2 nights)"],
-        ["Check in/out", "3:00 PM / 11:00 AM"],
-        ["Room", "Premium Room, 1 King Bed, City View"],
-        ["Address", "1-Chome, Kitano-cho, Chuo-ku, Kobe"],
-        ["Cost", "$246.40"]
-      ],
+      "confirmation": "2462970815",
+      "checkIn": "2026-06-17",
+      "checkOut": "2026-06-19",
+      "cost": "$246.40",
+      "notes": "Premium Room, 1 King Bed, City View\n1-Chome, Kitano-cho, Chuo-ku, Kobe\nCheck-in 3:00 PM / Check-out 11:00 AM",
       "url": "https://www.ihg.com/crowneplaza/hotels/us/en/hyogo/osakb/hoteldetail"
     },
     {
-      "type": "Hotel · Hiroshima", "icon": "hotel",
+      "category": "hotel",
+      "icon": "hotel",
       "title": "Hilton Hiroshima",
       "colorKey": "hiroshima",
-      "details": [
-        ["Confirmation", "3465440877"],
-        ["Dates", "Jun 19–22 (3 nights)"],
-        ["Check in/out", "3:00 PM / 12:00 PM"],
-        ["Room", "King Premium Room"],
-        ["Address", "11-12 Fujimicho, Naka-ku, Hiroshima"],
-        ["Phone", "+81-82-243-2700"],
-        ["Cost", "177,000 Hilton points"]
-      ],
+      "confirmation": "3465440877",
+      "checkIn": "2026-06-19",
+      "checkOut": "2026-06-22",
+      "cost": "177,000 Hilton points",
+      "notes": "King Premium Room\n11-12 Fujimicho, Naka-ku, Hiroshima\n+81-82-243-2700\nCheck-in 3:00 PM / Check-out 12:00 PM",
       "url": "https://www.hilton.com/en/hotels/hijshhi-hilton-hiroshima/"
     },
     {
-      "type": "Rail Transfers", "icon": "train",
+      "category": "rail",
+      "icon": "train",
       "title": "Intercity Trains",
       "colorKey": "transit",
-      "details": [
-        ["Jun 14", "Tokyo → Fujikawaguchiko"],
-        ["Jun 15", "Mt. Fuji area → Kyoto"],
-        ["Jun 17", "Kyoto → Kobe"],
-        ["Jun 19", "Kobe → Hiroshima (Shinkansen)"],
-        ["Jun 22", "Hiroshima → Tokyo (Shinkansen)"]
+      "confirmation": "",
+      "cost": "",
+      "legs": [
+        {"date": "2026-06-14", "route": "Tokyo → Fujikawaguchiko"},
+        {"date": "2026-06-15", "route": "Mt. Fuji area → Kyoto"},
+        {"date": "2026-06-17", "route": "Kyoto → Kobe"},
+        {"date": "2026-06-19", "route": "Kobe → Hiroshima (Shinkansen)"},
+        {"date": "2026-06-22", "route": "Hiroshima → Tokyo (Shinkansen)"}
       ],
+      "notes": "",
       "url": "https://www.google.com/maps/dir/Tokyo/Mount+Fuji/Kyoto/Kobe/Hiroshima/Tokyo"
     }
   ]
