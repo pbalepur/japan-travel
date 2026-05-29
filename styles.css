@@ -1497,42 +1497,43 @@ img { display: block; max-width: 100%; }
 }
 
 .booking-filters {
-  flex: 1;
+  /* no flex:1 — size to content so + Add stays right-docked */
 }
 
-/* Booking filter bar — matches itinerary pill style */
+/* Booking filter bar — same pill row style as itinerary */
 .bf-filter-bar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin: 0;          /* override the itinerary margin */
-  padding: 4px;
-  width: auto;
+  gap: 6px;
   flex-wrap: nowrap;
+  margin: 0;
+  padding: 0;
 }
 
-/* Place dropdown inside filter bar */
+/* Place dropdown inside filter bar — styled as a pill */
 .bf-place-select {
-  padding: 6px 10px;
-  border: none;
+  display: inline-block;
+  padding: 5px 28px 5px 14px;
+  border: 1.5px solid var(--border);
   border-radius: 999px;
-  background: transparent;
+  background-color: var(--bg-card);
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2378716c' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
   color: var(--ink-muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   font-family: var(--font-sans);
-  transition: all var(--transition);
+  transition: border-color var(--transition), color var(--transition);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2378716c' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 24px;
 }
 
-.bf-place-select:hover, .bf-place-select:focus {
+.bf-place-select:hover,
+.bf-place-select:focus {
+  border-color: var(--ink-muted);
   color: var(--ink);
 }
 

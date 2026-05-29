@@ -1345,8 +1345,8 @@ function renderBookingFilters() {
     </select>` : '';
 
   bar.innerHTML = `
-    <div class="filter-bar bf-filter-bar">
-      ${cats.map(c => `<button class="filter-btn${bookingFilter === c.key ? ' active' : ''}" data-bfilter="${c.key}">${c.label}</button>`).join('')}
+    <div class="bf-filter-bar">
+      ${cats.map(c => `<button class="filter-pill${bookingFilter === c.key ? ' active' : ''}" data-bfilter="${c.key}"${c.key === 'all' ? ' data-place="all"' : ''}>${c.label}</button>`).join('')}
       ${placeDropdown}
     </div>`;
 
