@@ -1312,11 +1312,17 @@ function bookingMetaLine(b) {
   return '';
 }
 
+function bookingVendorLabel(b) {
+  if (b.category === 'hotel') return 'Hotel site';
+  if (b.category === 'flight') return 'Airline';
+  if (b.category === 'rail') return 'Rail / Bus';
+  return 'Website';
+}
+
 function renderBookingFilters() {
   const bar = $('#booking-filters');
   if (!bar) return;
 
-  // Category row
   const cats = [
     { key: 'all', label: 'All' },
     { key: 'hotel', label: 'Hotels' },
@@ -1324,35 +1330,29 @@ function renderBookingFilters() {
     { key: 'rail', label: 'Rail' },
   ];
 
-  // Place row — only show places that have at least one booking
+  // Place dropdown — only show if 2+ places have bookings
   const usedPlaceKeys = [...new Set(trip.bookings.map(b => b.colorKey).filter(Boolean))];
-  const places = usedPlaceKeys
-    .map(k => ({ key: k, place: trip.places[k] }))
-    .filter(({ place }) => place);
+  const places = usedPlaceKeys.map(k => ({ key: k, place: trip.places[k] })).filter(({ place }) => place);
 
-  let html = `<div class="bf-row">
-    ${cats.map(c => `<button class="filter-btn${bookingFilter === c.key ? ' active' : ''}" data-bfilter="${c.key}">${c.label}</button>`).join('')}
-  </div>`;
-
-  if (places.length > 1) {
-    html += `<div class="bf-row bf-place-row">
-      <button class="filter-btn filter-btn-place${bookingPlaceFilter === 'all' ? ' active' : ''}" data-bplace="all">All places</button>
+  const placeDropdown = places.length > 1 ? `
+    <select class="bf-place-select" id="bf-place-select">
+      <option value="all">All places</option>
       ${places.map(({ key, place }) =>
-        `<button class="filter-btn filter-btn-place${bookingPlaceFilter === key ? ' active' : ''}" data-bplace="${key}">
-          ${place.emoji || ''} ${place.name}
-        </button>`
+        `<option value="${key}"${bookingPlaceFilter === key ? ' selected' : ''}>${place.emoji || ''} ${place.name}</option>`
       ).join('')}
-    </div>`;
-  }
+    </select>` : '';
 
-  bar.innerHTML = html;
+  bar.innerHTML = `
+    <div class="filter-bar bf-filter-bar">
+      ${cats.map(c => `<button class="filter-btn${bookingFilter === c.key ? ' active' : ''}" data-bfilter="${c.key}">${c.label}</button>`).join('')}
+      ${placeDropdown}
+    </div>`;
 
   bar.querySelectorAll('[data-bfilter]').forEach(btn => {
     btn.addEventListener('click', () => { bookingFilter = btn.dataset.bfilter; renderBookingFilters(); renderBookings(); });
   });
-  bar.querySelectorAll('[data-bplace]').forEach(btn => {
-    btn.addEventListener('click', () => { bookingPlaceFilter = btn.dataset.bplace; renderBookingFilters(); renderBookings(); });
-  });
+  const sel = bar.querySelector('#bf-place-select');
+  if (sel) sel.addEventListener('change', () => { bookingPlaceFilter = sel.value; renderBookings(); });
 }
 
 function renderBookings() {
@@ -1377,6 +1377,7 @@ function renderBookings() {
     const catLabel = b.category === 'flight' ? 'Flight' : b.category === 'rail' ? 'Rail' : 'Hotel';
     const meta = bookingMetaLine(b);
     const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(b.title + ' Japan')}`;
+    const vendorLabel = bookingVendorLabel(b);
 
     return `
       <div class="bm-row" data-idx="${idx}">
@@ -1391,7 +1392,8 @@ function renderBookings() {
             ${meta ? `<div class="bm-meta">${meta}</div>` : ''}
           </div>
           <div class="bm-actions">
-            <button class="bm-edit-btn" data-idx="${idx}" title="Edit">Edit ${ICONS.edit}</button>
+            <a href="${mapsUrl}" target="_blank" rel="noreferrer" class="bm-icon-link bm-link-map" title="Map" onclick="event.stopPropagation()">${ICONS.map}</a>
+            ${b.url ? `<a href="${escHtml(b.url)}" target="_blank" rel="noreferrer" class="bm-icon-link bm-link-vendor" title="${vendorLabel}" onclick="event.stopPropagation()">${ICONS.arrow}</a>` : ''}
             <button class="bm-toggle" title="Details">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
@@ -1401,7 +1403,8 @@ function renderBookings() {
           ${renderBookingBody(b)}
           <div class="bm-detail-footer">
             <a href="${mapsUrl}" target="_blank" rel="noreferrer" class="bm-link bm-link-map">${ICONS.map} Map</a>
-            ${b.url ? `<a href="${escHtml(b.url)}" target="_blank" rel="noreferrer" class="bm-link bm-link-booking">Booking ${ICONS.arrow}</a>` : ''}
+            ${b.url ? `<a href="${escHtml(b.url)}" target="_blank" rel="noreferrer" class="bm-link bm-link-vendor">${vendorLabel} ${ICONS.arrow}</a>` : ''}
+            <button class="bm-edit-btn" data-idx="${idx}">Edit ${ICONS.edit}</button>
           </div>
         </div>
       </div>`;
@@ -1409,35 +1412,31 @@ function renderBookings() {
 
   container.innerHTML = rows.join('');
 
-  // Expand/collapse
+  const toggleRow = (row) => {
+    const detail = row.querySelector('.bm-detail');
+    const isOpen = !detail.hidden;
+    detail.hidden = isOpen;
+    row.classList.toggle('bm-open', !isOpen);
+  };
+
+  // Toggle on chevron click
   container.querySelectorAll('.bm-toggle').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const row = btn.closest('.bm-row');
-      const detail = row.querySelector('.bm-detail');
-      const isOpen = !detail.hidden;
-      detail.hidden = isOpen;
-      row.classList.toggle('bm-open', !isOpen);
+    btn.addEventListener('click', (e) => { e.stopPropagation(); toggleRow(btn.closest('.bm-row')); });
+  });
+
+  // Toggle on row header click (not on icon links)
+  container.querySelectorAll('.bm-main').forEach(main => {
+    main.addEventListener('click', (e) => {
+      if (e.target.closest('.bm-icon-link')) return;
+      toggleRow(main.closest('.bm-row'));
     });
   });
 
-  // Edit
+  // Edit button (inside expanded detail)
   container.querySelectorAll('.bm-edit-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       openBookingEditor(parseInt(btn.dataset.idx));
-    });
-  });
-
-  // Click row to expand (but not on action buttons)
-  container.querySelectorAll('.bm-main').forEach(main => {
-    main.addEventListener('click', (e) => {
-      if (e.target.closest('.bm-actions')) return;
-      const row = main.closest('.bm-row');
-      const detail = row.querySelector('.bm-detail');
-      const isOpen = !detail.hidden;
-      detail.hidden = isOpen;
-      row.classList.toggle('bm-open', !isOpen);
     });
   });
 }

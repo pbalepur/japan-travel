@@ -1479,34 +1479,60 @@ img { display: block; max-width: 100%; }
    V4: BOOKING TOOLBAR & FILTERS
    ================================================ */
 
+.bookings-section .section-intro {
+  margin-bottom: 16px;
+}
+
 .booking-toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .booking-filters {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
-.bf-row {
+/* Booking filter bar — matches itinerary pill style */
+.bf-filter-bar {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;          /* override the itinerary margin */
+  padding: 4px;
+  width: auto;
+  flex-wrap: nowrap;
 }
 
-.bf-place-row .filter-btn {
-  font-size: 0.78rem;
+/* Place dropdown inside filter bar */
+.bf-place-select {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all var(--transition);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2378716c' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.bf-place-select:hover, .bf-place-select:focus {
+  color: var(--ink);
 }
 
 .booking-add-top-btn {
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 /* ================================================
@@ -1617,25 +1643,44 @@ img { display: block; max-width: 100%; }
 .bm-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
+/* Icon-only links in the row summary (map, vendor) */
+.bm-icon-link {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--ink-faint);
+  text-decoration: none;
+  transition: all var(--transition);
+}
+
+.bm-icon-link svg { width: 16px; height: 16px; }
+
+.bm-link-map:hover { background: var(--bamboo-light); color: var(--bamboo); }
+.bm-link-vendor:hover { background: var(--indigo-light); color: var(--indigo); }
+
+/* Edit button inside expanded detail footer */
 .bm-edit-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
+  padding: 5px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
   color: var(--ink-muted);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   font-family: var(--font-sans);
   transition: all var(--transition);
-  white-space: nowrap;
+  margin-left: auto;
 }
 
 .bm-edit-btn svg { width: 12px; height: 12px; }
@@ -1680,11 +1725,14 @@ img { display: block; max-width: 100%; }
 
 .bm-detail-footer {
   display: flex;
+  align-items: center;
   gap: 16px;
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border-light);
 }
+
+.bm-detail-footer .bm-link-vendor { color: var(--indigo); }
 
 .bm-link {
   display: inline-flex;
@@ -1859,11 +1907,11 @@ img { display: block; max-width: 100%; }
 .bpf-field textarea,
 .bpf-select {
   padding: 9px 12px;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   font-size: 0.88rem;
   font-family: var(--font-sans);
-  background: var(--bg);
+  background: var(--bg-card);   /* white, distinct from panel bg */
   color: var(--ink);
   width: 100%;
   box-sizing: border-box;
