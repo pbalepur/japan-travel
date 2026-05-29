@@ -187,7 +187,7 @@ img { display: block; max-width: 100%; }
   border-radius: var(--radius-lg);
   overflow: hidden;
   aspect-ratio: 4 / 5;
-  max-height: calc(100vh - 220px); /* always fits above the fold */
+  max-height: calc(92vh - 200px); /* tracks proportional header padding, stays ~19px above fold */
   text-decoration: none;
   color: #fffdf8;
   box-shadow: var(--shadow-lg);
