@@ -36,6 +36,7 @@ const ICONS = {
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
+  map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>',
 };
 
 // ===================================================================
@@ -89,6 +90,42 @@ function detectType(text) {
   if (/buffer|free|flexible|optional|pending|settle|packing/i.test(t)) return 'buffer';
   if (/check.?in|check.?out|hotel|aloft|toranomon|ubuya|ace hotel|crowne|hilton|marriott/i.test(t)) return 'hotel';
   return 'attraction';
+}
+
+// Find the days that belong to a specific route segment (by index).
+// Handles repeated places (e.g. Tokyo appears twice at different points).
+function getRouteSegmentDays(routeIdx) {
+  const stop = trip.route[routeIdx];
+  if (!stop) return [];
+
+  // Find consecutive days for this place starting from where previous segments end
+  let dayOffset = 0;
+  for (let r = 0; r < routeIdx; r++) {
+    dayOffset += trip.route[r].nights + (r === 0 ? 1 : 0); // first segment includes arrival day
+  }
+  if (routeIdx === 0) dayOffset = 0;
+
+  // Simpler approach: use dates. Parse the route "dates" field or just match by placeKey + contiguous block.
+  // Best approach: find contiguous runs of days with this placeKey
+  const runs = [];
+  let currentRun = null;
+  trip.days.forEach((d, i) => {
+    if (d.placeKey === stop.key) {
+      if (!currentRun) currentRun = { start: i, days: [d] };
+      else currentRun.days.push(d);
+    } else {
+      if (currentRun) { runs.push(currentRun); currentRun = null; }
+    }
+  });
+  if (currentRun) runs.push(currentRun);
+
+  // Match the Nth run of this placeKey to the Nth route entry with this key
+  let matchIdx = 0;
+  for (let r = 0; r < routeIdx; r++) {
+    if (trip.route[r].key === stop.key) matchIdx++;
+  }
+
+  return runs[matchIdx]?.days || [];
 }
 
 // ===================================================================
@@ -364,12 +401,18 @@ function renderPlaces() {
   const cards = trip.route.map((stop, i) => {
     const place = trip.places[stop.key];
     if (!place) return '';
-    const dayCount = trip.days.filter(d => d.placeKey === stop.key).length;
+
+    // Find days that belong to THIS route segment (by date range, not just placeKey)
+    const segDays = getRouteSegmentDays(i);
+    const dayCount = segDays.length;
+
+    // Hotels for this specific segment only
     const hotels = [...new Set(
-      trip.days.filter(d => d.placeKey === stop.key && d.stay?.hotel)
-        .map(d => d.stay.hotel)
+      segDays.filter(d => d.stay?.hotel).map(d => d.stay.hotel)
     )];
-    const hotelPreview = hotels.length ? hotels[0] : '';
+    const hotelLine = hotels.length > 1
+      ? `${hotels[0]} +${hotels.length - 1} more`
+      : hotels.length === 1 ? hotels[0] : '';
 
     return `
       <button class="city-card" data-place="${stop.key}" data-idx="${i}" style="--city-color:${place.color}; --city-bg:${place.bg}">
@@ -379,7 +422,7 @@ function renderPlaces() {
             <h3>${place.emoji} ${stop.city}</h3>
             <span class="city-dates">${stop.dates}</span>
             <span class="city-meta">${stop.nights}n · ${dayCount} day${dayCount > 1 ? 's' : ''}</span>
-            ${hotelPreview ? `<span class="city-hotel">${hotelPreview}</span>` : ''}
+            ${hotelLine ? `<span class="city-hotel">${escHtml(hotelLine)}</span>` : ''}
           </div>
           <a class="city-map-link" href="${mapsUrl(stop.city)}" target="_blank" rel="noreferrer" title="Open in Google Maps" onclick="event.stopPropagation()">
             ${ICONS.mapPin}
@@ -1047,6 +1090,34 @@ function initAddPlaceModal() {
     if (e.target === modal) closeAddPlaceModal();
   });
 
+  // Wire up date helpers for the modal
+  const apmStart = modal.querySelector('.apm-start');
+  const apmEnd = modal.querySelector('.apm-end');
+  const apmNights = modal.querySelector('.apm-nights');
+  if (apmStart && apmEnd) {
+    const { min, max } = tripDateRange();
+    if (min) { apmStart.min = min; apmEnd.min = min; }
+    if (max) {
+      const maxPlus = new Date(max + 'T00:00:00');
+      maxPlus.setDate(maxPlus.getDate() + 1);
+      const mp = maxPlus.toISOString().slice(0, 10);
+      apmStart.max = mp;
+      apmEnd.max = mp;
+    }
+    apmStart.addEventListener('change', () => {
+      if (apmStart.value) apmEnd.min = apmStart.value;
+      if (apmStart.value && !apmEnd.value) {
+        const next = new Date(apmStart.value + 'T00:00:00');
+        next.setDate(next.getDate() + 1);
+        apmEnd.value = next.toISOString().slice(0, 10);
+      }
+      if (apmNights) apmNights.value = calcNights(apmStart.value, apmEnd.value) || '';
+    });
+    apmEnd.addEventListener('change', () => {
+      if (apmNights) apmNights.value = calcNights(apmStart.value, apmEnd.value) || '';
+    });
+  }
+
   modal.querySelector('form').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -1054,8 +1125,12 @@ function initAddPlaceModal() {
     if (!name) return;
 
     const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const dates = fd.get('dates').toString().trim() || 'TBD';
-    const nights = parseInt(fd.get('nights')) || 1;
+    const startDate = fd.get('startDate') || '';
+    const endDate = fd.get('endDate') || '';
+    const nights = calcNights(startDate, endDate) || parseInt(fd.get('nights')) || 1;
+    const dates = (startDate && endDate)
+      ? `${new Date(startDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${new Date(endDate+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}`
+      : 'TBD';
     const lat = parseFloat(fd.get('lat')) || null;
     const lng = parseFloat(fd.get('lng')) || null;
 
@@ -1117,11 +1192,14 @@ function deletePlaceConfirm(placeKey) {
 //  RENDER: Bookings
 // ===================================================================
 
+let bookingFilter = 'all';
+
 function calcNights(checkIn, checkOut) {
   if (!checkIn || !checkOut) return null;
   const a = new Date(checkIn + 'T00:00:00');
   const b = new Date(checkOut + 'T00:00:00');
-  return Math.round((b - a) / 86400000);
+  const n = Math.round((b - a) / 86400000);
+  return n > 0 ? n : null;
 }
 
 function fmtBookingDate(dateStr) {
@@ -1136,6 +1214,17 @@ function fmtTime12(timeStr) {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hh = h % 12 || 12;
   return `${hh}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function getBookingSortDate(b) {
+  if (b.category === 'hotel') return b.checkIn || '9999';
+  if (b.category === 'flight') return b.outbound?.departDate || '9999';
+  if (b.category === 'rail') return b.transitDate || b.legs?.[0]?.date || '9999';
+  return '9999';
+}
+
+function sortBookings() {
+  trip.bookings.sort((a, b) => getBookingSortDate(a).localeCompare(getBookingSortDate(b)));
 }
 
 function renderBookingBody(b) {
@@ -1154,7 +1243,7 @@ function renderBookingBody(b) {
 
   if (b.category === 'flight') {
     const renderLeg = (leg, label) => {
-      if (!leg) return '';
+      if (!leg || !leg.departAirport) return '';
       return `
         <div class="booking-flight-leg">
           <span class="booking-flight-label">${label}</span>
@@ -1175,18 +1264,20 @@ function renderBookingBody(b) {
   }
 
   if (b.category === 'rail') {
-    const legItems = (b.legs || []).map(l =>
-      `<li><span class="booking-rail-date">${fmtBookingDate(l.date)}</span> ${escHtml(l.route)}</li>`
-    ).join('');
+    const route = (b.transitFrom && b.transitTo)
+      ? `${escHtml(b.transitFrom)} → ${escHtml(b.transitTo)}`
+      : (b.legs?.[0]?.route ? escHtml(b.legs[0].route) : '');
+    const date = b.transitDate || b.legs?.[0]?.date || '';
+    const time = b.transitTime ? ` · ${fmtTime12(b.transitTime)}` : '';
     return `
-      <ul class="booking-rail-legs">${legItems}</ul>
       <dl class="booking-dl">
+        ${route ? `<dt>Route</dt><dd>${route}</dd>` : ''}
+        ${date ? `<dt>Date</dt><dd>${fmtBookingDate(date)}${time}</dd>` : ''}
         ${b.confirmation ? `<dt>Confirmation</dt><dd class="booking-mono">${escHtml(b.confirmation)}</dd>` : ''}
         ${b.cost ? `<dt>Cost</dt><dd>${escHtml(b.cost)}</dd>` : ''}
       </dl>`;
   }
 
-  // Fallback for unknown categories
   return `<dl class="booking-dl">
     ${b.confirmation ? `<dt>Confirmation</dt><dd class="booking-mono">${escHtml(b.confirmation)}</dd>` : ''}
     ${b.cost ? `<dt>Cost</dt><dd>${escHtml(b.cost)}</dd>` : ''}
@@ -1194,15 +1285,61 @@ function renderBookingBody(b) {
   </dl>`;
 }
 
+function renderBookingFilters() {
+  const bar = $('#booking-filters');
+  if (!bar) return;
+  const cats = [
+    { key: 'all', label: 'All' },
+    { key: 'hotel', label: 'Hotels' },
+    { key: 'flight', label: 'Flights' },
+    { key: 'rail', label: 'Rail' },
+  ];
+  bar.innerHTML = cats.map(c =>
+    `<button class="filter-btn${bookingFilter === c.key ? ' active' : ''}" data-bfilter="${c.key}">${c.label}</button>`
+  ).join('');
+  bar.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      bookingFilter = btn.dataset.bfilter;
+      renderBookingFilters();
+      renderBookings();
+    });
+  });
+}
+
 function renderBookings() {
   const bookingGrid = $('#booking-grid');
   if (!bookingGrid) return;
 
-  bookingGrid.innerHTML = trip.bookings.map((b, idx) => {
+  sortBookings();
+
+  const filtered = bookingFilter === 'all'
+    ? trip.bookings
+    : trip.bookings.filter(b => b.category === bookingFilter);
+
+  if (filtered.length === 0) {
+    bookingGrid.innerHTML = `<div class="booking-empty">No ${bookingFilter === 'all' ? '' : bookingFilter + ' '}bookings yet.</div>`;
+    return;
+  }
+
+  let html = '';
+  let lastPlaceKey = null;
+
+  filtered.forEach(b => {
+    const idx = trip.bookings.indexOf(b);
     const place = trip.places[b.colorKey] || trip.places.transit;
     const icon = ICONS[b.icon] || ICONS.hotel;
     const categoryLabel = b.category === 'flight' ? 'Flight' : b.category === 'rail' ? 'Rail' : 'Hotel';
-    return `
+
+    // Place group header
+    if (b.colorKey !== lastPlaceKey) {
+      lastPlaceKey = b.colorKey;
+      html += `<div class="booking-place-header" style="--bph-color:${place.color}">
+        <span class="booking-place-emoji">${place.emoji || ''}</span>
+        <span>${escHtml(place.name)}</span>
+      </div>`;
+    }
+
+    html += `
       <article class="booking-card" data-booking-idx="${idx}" style="--booking-color:${place.color}; --booking-color-bg:${place.bg}">
         <div class="booking-card-header">
           <div class="booking-icon">${icon}</div>
@@ -1216,333 +1353,490 @@ function renderBookings() {
         </div>
         <div class="booking-card-footer">
           <button class="booking-footer-edit" data-idx="${idx}">Edit ${ICONS.edit}</button>
-          ${b.url ? `<a href="${escHtml(b.url)}" target="_blank" rel="noreferrer">View ${ICONS.arrow}</a>` : ''}
+          <a href="https://www.google.com/maps/search/${encodeURIComponent(b.title + ' Japan')}" target="_blank" rel="noreferrer" class="booking-footer-maps">${ICONS.map} Map</a>
+          ${b.url ? `<a href="${escHtml(b.url)}" target="_blank" rel="noreferrer">Booking ${ICONS.arrow}</a>` : ''}
         </div>
       </article>`;
-  }).join('') + `
-    <button class="booking-add-card" id="booking-add-btn">
-      <span class="booking-add-icon">${ICONS.plus}</span>
-      <span>Add Booking</span>
-    </button>`;
+  });
+
+  bookingGrid.innerHTML = html;
 
   // Attach edit handlers
   bookingGrid.querySelectorAll('.booking-footer-edit').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const idx = parseInt(btn.dataset.idx);
-      openBookingEditor(idx);
+      openBookingEditor(parseInt(btn.dataset.idx));
     });
   });
-
-  // Add booking handler
-  const addBtn = $('#booking-add-btn');
-  if (addBtn) addBtn.addEventListener('click', openNewBookingForm);
 }
 
 // ===================================================================
-//  Booking Editor — Structured Forms
+//  Booking Panel (slide-out editor)
 // ===================================================================
 
-function buildHotelForm(b) {
+function tripDateRange() {
+  return { min: trip.meta.startDate || '', max: trip.meta.endDate || '' };
+}
+
+function placePickerHtml(selected, required) {
+  const opts = Object.entries(trip.places)
+    .filter(([k]) => k !== 'home')
+    .map(([key, p]) => `<option value="${key}"${key === selected ? ' selected' : ''}>${p.emoji} ${p.name}</option>`)
+    .join('');
+  return `<option value=""${!selected ? ' selected' : ''}>— Select place —</option>${opts}`;
+}
+
+function openBookingPanel(title, formHtml, onSubmit, onDelete) {
+  const panel = $('#booking-panel');
+  const body = $('#booking-panel-body');
+  const titleEl = panel.querySelector('.booking-panel-title');
+  titleEl.textContent = title;
+
+  body.innerHTML = `<form class="bpf" id="bpf-form">${formHtml}
+    <div class="bpf-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+      ${onDelete ? '<button type="button" class="btn btn-danger bpf-delete">Delete Booking</button>' : ''}
+    </div>
+  </form>`;
+
+  panel.classList.add('open');
+  const form = body.querySelector('#bpf-form');
+
+  // Wire up date helpers
+  wireUpDateHelpers(form);
+
+  // Close handlers
+  const close = () => panel.classList.remove('open');
+  panel.querySelector('.booking-panel-close').onclick = close;
+  panel.querySelector('.booking-panel-backdrop').onclick = close;
+
+  // Delete
+  const delBtn = form.querySelector('.bpf-delete');
+  if (delBtn && onDelete) delBtn.addEventListener('click', () => { close(); onDelete(); });
+
+  // Submit
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    close();
+    onSubmit(new FormData(form));
+  });
+
+  // Focus first input after a tick (panel animation)
+  setTimeout(() => {
+    const first = form.querySelector('input:not([readonly]):not([type="hidden"]), select');
+    if (first) first.focus();
+  }, 100);
+}
+
+function placeKeyForDate(dateStr) {
+  if (!dateStr) return null;
+  const day = trip.days.find(d => d.date === dateStr);
+  return day?.placeKey || null;
+}
+
+function wireUpDateHelpers(form) {
+  const { min, max } = tripDateRange();
+
+  // Set all date inputs to trip range so picker opens in the right month
+  form.querySelectorAll('input[type="date"]').forEach(inp => {
+    if (!inp.min) inp.min = min;
+    if (!inp.max) {
+      const maxPlus = new Date(max + 'T00:00:00');
+      maxPlus.setDate(maxPlus.getDate() + 1);
+      inp.max = maxPlus.toISOString().slice(0, 10);
+    }
+  });
+
+  // Auto-suggest place from check-in date
+  const placeSel = form.querySelector('select[name="colorKey"]');
+  const autoSuggestPlace = (dateStr) => {
+    if (!placeSel || !dateStr) return;
+    const key = placeKeyForDate(dateStr);
+    if (key && placeSel.value === '') placeSel.value = key;
+  };
+
+  // Hotel check-in → check-out linking
+  const ci = form.querySelector('input[name="checkIn"]');
+  const co = form.querySelector('input[name="checkOut"]');
+  const nights = form.querySelector('input[name="_nights"]');
+  if (ci && co) {
+    const sync = () => {
+      if (ci.value) co.min = ci.value;
+      if (ci.value && !co.value) {
+        const next = new Date(ci.value + 'T00:00:00');
+        next.setDate(next.getDate() + 1);
+        co.value = next.toISOString().slice(0, 10);
+      }
+      if (ci.value && co.value && co.value <= ci.value) {
+        const next = new Date(ci.value + 'T00:00:00');
+        next.setDate(next.getDate() + 1);
+        co.value = next.toISOString().slice(0, 10);
+      }
+      if (nights) {
+        const n = calcNights(ci.value, co.value);
+        nights.value = n || '';
+      }
+      autoSuggestPlace(ci.value);
+    };
+    ci.addEventListener('change', sync);
+    co.addEventListener('change', () => {
+      if (nights) { const n = calcNights(ci.value, co.value); nights.value = n || ''; }
+    });
+  }
+
+  // Transit date → auto-suggest place
+  const td = form.querySelector('input[name="transitDate"]');
+  if (td) {
+    td.addEventListener('change', () => autoSuggestPlace(td.value));
+  }
+
+  // Transit From/To "Other" toggle + hidden input sync
+  form.querySelectorAll('.bpf-place-or-other').forEach(wrapper => {
+    const sel = wrapper.querySelector('select');
+    const otherInp = wrapper.querySelector('.bpf-other-input');
+    const hidden = wrapper.querySelector('input[type="hidden"]');
+    if (!sel || !otherInp || !hidden) return;
+    const syncHidden = () => {
+      hidden.value = sel.value === '__other__' ? otherInp.value.trim() : (sel.value || '');
+    };
+    const toggle = () => {
+      if (sel.value === '__other__') {
+        otherInp.style.display = '';
+        otherInp.focus();
+      } else {
+        otherInp.style.display = 'none';
+        otherInp.value = '';
+      }
+      syncHidden();
+    };
+    sel.addEventListener('change', toggle);
+    otherInp.addEventListener('input', syncHidden);
+    toggle();
+  });
+
+  // Auto-generate transit title from From/To
+  const fromHidden = form.querySelector('input[name="transitFrom"]');
+  const toHidden = form.querySelector('input[name="transitTo"]');
+  const titleInp = form.querySelector('input[name="title"]');
+  if (fromHidden && toHidden && titleInp) {
+    const autoTitle = () => {
+      const f = fromHidden.value, t = toHidden.value;
+      if (!f && !t) return;
+      const current = titleInp.value.trim();
+      if (!current || /^.+ → .+$/.test(current) || current === '') {
+        if (f && t) titleInp.value = `${f} → ${t}`;
+        else if (f) titleInp.value = `${f} →`;
+        else if (t) titleInp.value = `→ ${t}`;
+      }
+    };
+    const observe = () => setTimeout(autoTitle, 0);
+    form.querySelectorAll('.bpf-transit-sel').forEach(s => s.addEventListener('change', observe));
+    form.querySelectorAll('.bpf-other-input').forEach(i => i.addEventListener('input', observe));
+  }
+}
+
+function buildHotelFields(b) {
+  const { min, max } = tripDateRange();
   return `
-    <div class="bef-field">
-      <label>Hotel name</label>
-      <input type="text" name="title" value="${escHtml(b.title)}" required>
+    <div class="bpf-field">
+      <label>Place <span class="bpf-req">*</span></label>
+      <select name="colorKey" class="bpf-select" required>${placePickerHtml(b.colorKey, true)}</select>
     </div>
-    <div class="bef-row">
-      <div class="bef-field">
-        <label>Check-in</label>
-        <input type="date" name="checkIn" value="${b.checkIn || ''}" required>
+    <div class="bpf-field">
+      <label>Hotel name <span class="bpf-req">*</span></label>
+      <input type="text" name="title" value="${escHtml(b.title)}" required placeholder="e.g. Aloft Tokyo Ginza">
+    </div>
+    <div class="bpf-row">
+      <div class="bpf-field">
+        <label>Check-in <span class="bpf-req">*</span></label>
+        <input type="date" name="checkIn" value="${b.checkIn || ''}" required min="${min}" max="${max}">
       </div>
-      <div class="bef-field">
-        <label>Check-out</label>
-        <input type="date" name="checkOut" value="${b.checkOut || ''}" required>
+      <div class="bpf-field">
+        <label>Check-out <span class="bpf-req">*</span></label>
+        <input type="date" name="checkOut" value="${b.checkOut || ''}" required min="${b.checkIn || min}">
       </div>
-      <div class="bef-field bef-field-sm">
+      <div class="bpf-field bpf-field-sm">
         <label>Nights</label>
-        <input type="text" name="_nights" value="${calcNights(b.checkIn, b.checkOut) || ''}" readonly class="bef-readonly">
+        <input type="text" name="_nights" value="${calcNights(b.checkIn, b.checkOut) || ''}" readonly class="bpf-readonly">
       </div>
     </div>
-    <div class="bef-row">
-      <div class="bef-field">
-        <label>Confirmation</label>
+    <div class="bpf-row">
+      <div class="bpf-field">
+        <label>Confirmation #</label>
         <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}">
       </div>
-      <div class="bef-field">
+      <div class="bpf-field">
         <label>Cost</label>
-        <input type="text" name="cost" value="${escHtml(b.cost || '')}">
+        <input type="text" name="cost" value="${escHtml(b.cost || '')}" placeholder="e.g. $500 or 50,000 pts">
       </div>
     </div>
-    <div class="bef-field">
+    <div class="bpf-field">
       <label>Notes</label>
       <textarea name="notes" rows="3" placeholder="Room type, address, phone...">${escHtml(b.notes || '')}</textarea>
     </div>
-    <div class="bef-field">
-      <label>URL</label>
+    <div class="bpf-field">
+      <label>Booking URL</label>
       <input type="url" name="url" value="${escHtml(b.url || '')}" placeholder="https://...">
     </div>`;
 }
 
-function buildFlightForm(b) {
-  const legFields = (leg, prefix, label) => {
+function buildFlightFields(b) {
+  const legHtml = (leg, prefix, label) => {
     if (!leg) leg = {};
     return `
-    <fieldset class="bef-leg">
+    <fieldset class="bpf-fieldset">
       <legend>${label}</legend>
-      <div class="bef-row">
-        <div class="bef-field">
-          <label>Flight</label>
-          <input type="text" name="${prefix}_flight" value="${escHtml(leg.flight || '')}" placeholder="UA 837">
-        </div>
-        <div class="bef-field">
-          <label>From</label>
-          <input type="text" name="${prefix}_departAirport" value="${escHtml(leg.departAirport || '')}" placeholder="SFO" maxlength="4">
-        </div>
-        <div class="bef-field">
-          <label>To</label>
-          <input type="text" name="${prefix}_arriveAirport" value="${escHtml(leg.arriveAirport || '')}" placeholder="NRT" maxlength="4">
-        </div>
+      <div class="bpf-row">
+        <div class="bpf-field"><label>Flight #</label>
+          <input type="text" name="${prefix}_flight" value="${escHtml(leg.flight || '')}" placeholder="UA 837"></div>
+        <div class="bpf-field"><label>From</label>
+          <input type="text" name="${prefix}_departAirport" value="${escHtml(leg.departAirport || '')}" placeholder="SFO" maxlength="4" style="text-transform:uppercase"></div>
+        <div class="bpf-field"><label>To</label>
+          <input type="text" name="${prefix}_arriveAirport" value="${escHtml(leg.arriveAirport || '')}" placeholder="NRT" maxlength="4" style="text-transform:uppercase"></div>
       </div>
-      <div class="bef-row">
-        <div class="bef-field">
-          <label>Depart date</label>
-          <input type="date" name="${prefix}_departDate" value="${leg.departDate || ''}">
-        </div>
-        <div class="bef-field">
-          <label>Depart time</label>
-          <input type="time" name="${prefix}_departTime" value="${leg.departTime || ''}">
-        </div>
+      <div class="bpf-row">
+        <div class="bpf-field"><label>Depart</label>
+          <input type="date" name="${prefix}_departDate" value="${leg.departDate || ''}"></div>
+        <div class="bpf-field"><label>Time</label>
+          <input type="time" name="${prefix}_departTime" value="${leg.departTime || ''}"></div>
       </div>
-      <div class="bef-row">
-        <div class="bef-field">
-          <label>Arrive date</label>
-          <input type="date" name="${prefix}_arriveDate" value="${leg.arriveDate || ''}">
-        </div>
-        <div class="bef-field">
-          <label>Arrive time</label>
-          <input type="time" name="${prefix}_arriveTime" value="${leg.arriveTime || ''}">
-        </div>
+      <div class="bpf-row">
+        <div class="bpf-field"><label>Arrive</label>
+          <input type="date" name="${prefix}_arriveDate" value="${leg.arriveDate || ''}"></div>
+        <div class="bpf-field"><label>Time</label>
+          <input type="time" name="${prefix}_arriveTime" value="${leg.arriveTime || ''}"></div>
       </div>
     </fieldset>`;
   };
   return `
-    <div class="bef-field">
-      <label>Title</label>
-      <input type="text" name="title" value="${escHtml(b.title)}" required>
+    <div class="bpf-field">
+      <label>Place</label>
+      <select name="colorKey" class="bpf-select">${placePickerHtml(b.colorKey, false)}</select>
     </div>
-    ${legFields(b.outbound, 'out', 'Outbound')}
-    ${legFields(b.inbound, 'in', 'Return')}
-    <div class="bef-row">
-      <div class="bef-field">
-        <label>Confirmation</label>
-        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}">
-      </div>
-      <div class="bef-field">
-        <label>Cost</label>
-        <input type="text" name="cost" value="${escHtml(b.cost || '')}">
-      </div>
+    <div class="bpf-field">
+      <label>Title <span class="bpf-req">*</span></label>
+      <input type="text" name="title" value="${escHtml(b.title)}" required placeholder="e.g. United SFO ↔ NRT">
     </div>
-    <div class="bef-field">
+    ${legHtml(b.outbound, 'out', 'Outbound')}
+    ${legHtml(b.inbound, 'in', 'Return')}
+    <div class="bpf-row">
+      <div class="bpf-field"><label>Confirmation #</label>
+        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}"></div>
+      <div class="bpf-field"><label>Cost</label>
+        <input type="text" name="cost" value="${escHtml(b.cost || '')}"></div>
+    </div>
+    <div class="bpf-field">
       <label>Notes</label>
       <textarea name="notes" rows="2" placeholder="Aircraft, class...">${escHtml(b.notes || '')}</textarea>
     </div>
-    <div class="bef-field">
-      <label>URL</label>
+    <div class="bpf-field">
+      <label>Booking URL</label>
       <input type="url" name="url" value="${escHtml(b.url || '')}" placeholder="https://...">
     </div>`;
 }
 
-function buildRailForm(b) {
-  const legRows = (b.legs || []).map((l, i) => `
-    <div class="bef-row bef-leg-row" data-leg-idx="${i}">
-      <div class="bef-field">
-        <input type="date" name="leg_date_${i}" value="${l.date || ''}">
-      </div>
-      <div class="bef-field bef-field-grow">
-        <input type="text" name="leg_route_${i}" value="${escHtml(l.route || '')}" placeholder="City A → City B">
-      </div>
-      <button type="button" class="bef-leg-remove btn btn-outline btn-xs" data-leg="${i}" title="Remove">×</button>
-    </div>`).join('');
+function transitPlacePickerHtml(selected) {
+  const places = Object.entries(trip.places)
+    .filter(([k]) => k !== 'home')
+    .map(([key, p]) => ({ key, name: p.name, emoji: p.emoji }));
+  const matchKey = places.find(p => p.name === selected);
+  const isOther = selected && !matchKey;
+  let opts = '<option value="">—</option>';
+  places.forEach(p => {
+    opts += `<option value="${escHtml(p.name)}"${p.name === selected ? ' selected' : ''}>${p.emoji} ${p.name}</option>`;
+  });
+  opts += `<option value="__other__"${isOther ? ' selected' : ''}>Other…</option>`;
+  return opts;
+}
 
+function buildTransitFields(b) {
+  const { min, max } = tripDateRange();
+  const fromIsOther = b.transitFrom && !Object.values(trip.places).some(p => p.name === b.transitFrom);
+  const toIsOther = b.transitTo && !Object.values(trip.places).some(p => p.name === b.transitTo);
   return `
-    <div class="bef-field">
-      <label>Title</label>
-      <input type="text" name="title" value="${escHtml(b.title)}" required>
+    <div class="bpf-field">
+      <label>Place</label>
+      <select name="colorKey" class="bpf-select">${placePickerHtml(b.colorKey, false)}</select>
     </div>
-    <div class="bef-field">
-      <label>Legs</label>
-      <div class="bef-legs-list" id="bef-legs-list">${legRows}</div>
-      <button type="button" class="btn btn-outline btn-xs bef-add-leg">+ Add leg</button>
+    <div class="bpf-field">
+      <label>Title <span class="bpf-req">*</span></label>
+      <input type="text" name="title" value="${escHtml(b.title)}" required placeholder="e.g. Shinkansen Tokyo → Kyoto">
     </div>
-    <div class="bef-row">
-      <div class="bef-field">
-        <label>Confirmation</label>
-        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}">
+    <div class="bpf-row">
+      <div class="bpf-field"><label>Date <span class="bpf-req">*</span></label>
+        <input type="date" name="transitDate" value="${b.transitDate || (b.legs?.[0]?.date) || ''}" required min="${min}" max="${max}"></div>
+      <div class="bpf-field"><label>Time</label>
+        <input type="time" name="transitTime" value="${b.transitTime || ''}"></div>
+    </div>
+    <div class="bpf-row">
+      <div class="bpf-field bpf-place-or-other"><label>From</label>
+        <input type="hidden" name="transitFrom" value="${escHtml(b.transitFrom || '')}">
+        <select class="bpf-select bpf-transit-sel">${transitPlacePickerHtml(b.transitFrom || '')}</select>
+        <input type="text" class="bpf-other-input" value="${fromIsOther ? escHtml(b.transitFrom) : ''}" placeholder="Enter location" style="display:${fromIsOther ? '' : 'none'}; margin-top:6px">
       </div>
-      <div class="bef-field">
-        <label>Cost</label>
-        <input type="text" name="cost" value="${escHtml(b.cost || '')}">
+      <div class="bpf-field bpf-place-or-other"><label>To</label>
+        <input type="hidden" name="transitTo" value="${escHtml(b.transitTo || '')}">
+        <select class="bpf-select bpf-transit-sel">${transitPlacePickerHtml(b.transitTo || '')}</select>
+        <input type="text" class="bpf-other-input" value="${toIsOther ? escHtml(b.transitTo) : ''}" placeholder="Enter location" style="display:${toIsOther ? '' : 'none'}; margin-top:6px">
       </div>
     </div>
-    <div class="bef-field">
+    <div class="bpf-row">
+      <div class="bpf-field"><label>Confirmation #</label>
+        <input type="text" name="confirmation" value="${escHtml(b.confirmation || '')}"></div>
+      <div class="bpf-field"><label>Cost</label>
+        <input type="text" name="cost" value="${escHtml(b.cost || '')}"></div>
+    </div>
+    <div class="bpf-field">
       <label>Notes</label>
-      <textarea name="notes" rows="2">${escHtml(b.notes || '')}</textarea>
+      <textarea name="notes" rows="2" placeholder="Seat, platform...">${escHtml(b.notes || '')}</textarea>
     </div>
-    <div class="bef-field">
-      <label>URL</label>
+    <div class="bpf-field">
+      <label>Booking URL</label>
       <input type="url" name="url" value="${escHtml(b.url || '')}" placeholder="https://...">
     </div>`;
+}
+
+function readFormIntoBooking(fd, booking) {
+  booking.title = fd.get('title')?.toString().trim() || '';
+  booking.colorKey = fd.get('colorKey')?.toString() || booking.colorKey || 'transit';
+  booking.url = fd.get('url')?.toString().trim() || '';
+  booking.confirmation = fd.get('confirmation')?.toString().trim() || '';
+  booking.cost = fd.get('cost')?.toString().trim() || '';
+  booking.notes = fd.get('notes')?.toString().trim() || '';
+
+  if (booking.category === 'hotel') {
+    booking.checkIn = fd.get('checkIn') || '';
+    booking.checkOut = fd.get('checkOut') || '';
+  } else if (booking.category === 'flight') {
+    const readLeg = (prefix) => ({
+      flight: fd.get(`${prefix}_flight`)?.toString().trim() || '',
+      departAirport: fd.get(`${prefix}_departAirport`)?.toString().trim().toUpperCase() || '',
+      arriveAirport: fd.get(`${prefix}_arriveAirport`)?.toString().trim().toUpperCase() || '',
+      departDate: fd.get(`${prefix}_departDate`) || '',
+      departTime: fd.get(`${prefix}_departTime`) || '',
+      arriveDate: fd.get(`${prefix}_arriveDate`) || '',
+      arriveTime: fd.get(`${prefix}_arriveTime`) || '',
+    });
+    booking.outbound = readLeg('out');
+    booking.inbound = readLeg('in');
+  } else if (booking.category === 'rail') {
+    booking.transitDate = fd.get('transitDate') || '';
+    booking.transitTime = fd.get('transitTime') || '';
+    booking.transitFrom = fd.get('transitFrom')?.toString().trim() || '';
+    booking.transitTo = fd.get('transitTo')?.toString().trim() || '';
+  }
 }
 
 function openBookingEditor(idx) {
   const booking = trip.bookings[idx];
   if (!booking) return;
-
-  // Check if already editing
-  const card = $(`.booking-card[data-booking-idx="${idx}"]`);
-  if (!card || card.querySelector('.booking-edit-form')) return;
-
-  // Snapshot for undo
   const snapshot = JSON.parse(JSON.stringify(booking));
 
-  const body = card.querySelector('.booking-card-body');
-  const footer = card.querySelector('.booking-card-footer');
-  body.style.display = 'none';
-  footer.style.display = 'none';
-
-  const form = document.createElement('form');
-  form.className = 'booking-edit-form';
-
   let fields = '';
-  if (booking.category === 'hotel') fields = buildHotelForm(booking);
-  else if (booking.category === 'flight') fields = buildFlightForm(booking);
-  else if (booking.category === 'rail') fields = buildRailForm(booking);
-  else fields = buildHotelForm(booking); // fallback
+  if (booking.category === 'hotel') fields = buildHotelFields(booking);
+  else if (booking.category === 'flight') fields = buildFlightFields(booking);
+  else fields = buildTransitFields(booking);
 
-  form.innerHTML = `
-    ${fields}
-    <div class="bef-actions">
-      <button type="submit" class="btn btn-primary btn-sm">Save</button>
-      <button type="button" class="btn btn-outline btn-sm bef-cancel">Cancel</button>
-      <button type="button" class="btn btn-danger btn-sm bef-delete">Delete</button>
-    </div>`;
+  const catLabel = booking.category === 'flight' ? 'Flight' : booking.category === 'hotel' ? 'Hotel' : 'Transit';
 
-  body.after(form);
-  form.querySelector('input[name="title"]').focus();
-
-  // Auto-calc nights when dates change (hotel)
-  if (booking.category === 'hotel') {
-    const ciInput = form.querySelector('input[name="checkIn"]');
-    const coInput = form.querySelector('input[name="checkOut"]');
-    const nightsInput = form.querySelector('input[name="_nights"]');
-    const updateNights = () => {
-      const n = calcNights(ciInput.value, coInput.value);
-      nightsInput.value = n > 0 ? n : '';
-    };
-    ciInput.addEventListener('change', updateNights);
-    coInput.addEventListener('change', updateNights);
-  }
-
-  // Rail: add/remove legs
-  if (booking.category === 'rail') {
-    const legsList = form.querySelector('#bef-legs-list');
-    form.querySelector('.bef-add-leg').addEventListener('click', () => {
-      const i = legsList.children.length;
-      const row = document.createElement('div');
-      row.className = 'bef-row bef-leg-row';
-      row.dataset.legIdx = i;
-      row.innerHTML = `
-        <div class="bef-field">
-          <input type="date" name="leg_date_${i}" value="">
-        </div>
-        <div class="bef-field bef-field-grow">
-          <input type="text" name="leg_route_${i}" value="" placeholder="City A → City B">
-        </div>
-        <button type="button" class="bef-leg-remove btn btn-outline btn-xs" data-leg="${i}" title="Remove">×</button>`;
-      legsList.appendChild(row);
-    });
-    legsList.addEventListener('click', (e) => {
-      if (e.target.classList.contains('bef-leg-remove')) {
-        e.target.closest('.bef-leg-row').remove();
-      }
-    });
-  }
-
-  // Cancel
-  form.querySelector('.bef-cancel').addEventListener('click', () => {
-    form.remove();
-    body.style.display = '';
-    footer.style.display = '';
-  });
-
-  // Delete
-  form.querySelector('.bef-delete').addEventListener('click', () => {
-    trip.bookings.splice(idx, 1);
-    saveTrip();
-    renderBookings();
-    showUndoToast('Booking deleted', () => {
-      trip.bookings.splice(idx, 0, snapshot);
+  openBookingPanel(`Edit ${catLabel}`, fields,
+    (fd) => {
+      readFormIntoBooking(fd, booking);
+      if (booking.category === 'hotel') syncBookingToStays(booking);
+      sortBookings();
       saveTrip();
       renderBookings();
-    });
-  });
-
-  // Submit
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
-
-    booking.title = fd.get('title').toString().trim();
-    booking.url = fd.get('url')?.toString().trim() || '';
-    booking.confirmation = fd.get('confirmation')?.toString().trim() || '';
-    booking.cost = fd.get('cost')?.toString().trim() || '';
-    booking.notes = fd.get('notes')?.toString().trim() || '';
-
-    if (booking.category === 'hotel') {
-      booking.checkIn = fd.get('checkIn') || '';
-      booking.checkOut = fd.get('checkOut') || '';
-      syncBookingToStays(booking);
-    } else if (booking.category === 'flight') {
-      booking.outbound = {
-        flight: fd.get('out_flight')?.toString().trim() || '',
-        departAirport: fd.get('out_departAirport')?.toString().trim().toUpperCase() || '',
-        arriveAirport: fd.get('out_arriveAirport')?.toString().trim().toUpperCase() || '',
-        departDate: fd.get('out_departDate') || '',
-        departTime: fd.get('out_departTime') || '',
-        arriveDate: fd.get('out_arriveDate') || '',
-        arriveTime: fd.get('out_arriveTime') || '',
-      };
-      booking.inbound = {
-        flight: fd.get('in_flight')?.toString().trim() || '',
-        departAirport: fd.get('in_departAirport')?.toString().trim().toUpperCase() || '',
-        arriveAirport: fd.get('in_arriveAirport')?.toString().trim().toUpperCase() || '',
-        departDate: fd.get('in_departDate') || '',
-        departTime: fd.get('in_departTime') || '',
-        arriveDate: fd.get('in_arriveDate') || '',
-        arriveTime: fd.get('in_arriveTime') || '',
-      };
-    } else if (booking.category === 'rail') {
-      const legRows = form.querySelectorAll('.bef-leg-row');
-      booking.legs = [];
-      legRows.forEach(row => {
-        const i = row.dataset.legIdx;
-        const date = fd.get(`leg_date_${i}`)?.toString() || '';
-        const route = fd.get(`leg_route_${i}`)?.toString().trim() || '';
-        if (date || route) booking.legs.push({ date, route });
+      renderPlaces();
+      showUndoToast('Booking updated', () => {
+        Object.assign(trip.bookings[trip.bookings.indexOf(booking)] || {}, snapshot);
+        if (snapshot.category === 'hotel') syncBookingToStays(snapshot);
+        sortBookings();
+        saveTrip();
+        renderBookings();
+        renderPlaces();
+      });
+    },
+    () => {
+      if (booking.category === 'hotel') removeBookingStays(booking);
+      trip.bookings.splice(trip.bookings.indexOf(booking), 1);
+      saveTrip();
+      renderBookings();
+      renderPlaces();
+      showUndoToast('Booking deleted', () => {
+        trip.bookings.push(snapshot);
+        if (snapshot.category === 'hotel') syncBookingToStays(snapshot);
+        sortBookings();
+        saveTrip();
+        renderBookings();
+        renderPlaces();
       });
     }
+  );
+}
 
-    saveTrip();
-    renderBookings();
+function openNewBookingForm(category) {
+  if (!category) {
+    // Show type picker in the panel
+    const pickerHtml = `
+      <p class="bpf-hint">What type of booking?</p>
+      <div class="bpf-type-grid">
+        <button type="button" class="bpf-type-btn" data-cat="hotel">${ICONS.hotel}<span>Hotel</span></button>
+        <button type="button" class="bpf-type-btn" data-cat="flight">${ICONS.plane}<span>Flight</span></button>
+        <button type="button" class="bpf-type-btn" data-cat="rail">${ICONS.train}<span>Rail / Bus</span></button>
+      </div>`;
+    openBookingPanel('New Booking', pickerHtml, () => {}, null);
+    // Prevent form submit on type picker (no actual form fields yet)
+    const form = $('#bpf-form');
+    if (form) form.querySelector('.bpf-actions').style.display = 'none';
+    // Wire type buttons
+    document.querySelectorAll('.bpf-type-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        $('#booking-panel').classList.remove('open');
+        setTimeout(() => openNewBookingForm(btn.dataset.cat), 200);
+      });
+    });
+    return;
+  }
 
-    showUndoToast('Booking updated', () => {
-      trip.bookings[idx] = snapshot;
+  const blank = {
+    category,
+    icon: category === 'flight' ? 'plane' : category === 'rail' ? 'train' : 'hotel',
+    title: '', colorKey: '', confirmation: '', cost: '', notes: '', url: '',
+  };
+  if (category === 'hotel') { blank.checkIn = ''; blank.checkOut = ''; }
+  if (category === 'flight') { blank.outbound = {}; blank.inbound = {}; }
+  if (category === 'rail') { blank.transitDate = ''; blank.transitTime = ''; blank.transitFrom = ''; blank.transitTo = ''; }
+
+  let fields = '';
+  if (category === 'hotel') fields = buildHotelFields(blank);
+  else if (category === 'flight') fields = buildFlightFields(blank);
+  else fields = buildTransitFields(blank);
+
+  const catLabel = category === 'flight' ? 'Flight' : category === 'hotel' ? 'Hotel' : 'Rail / Bus';
+
+  openBookingPanel(`New ${catLabel}`, fields,
+    (fd) => {
+      readFormIntoBooking(fd, blank);
+      trip.bookings.push(blank);
+      if (category === 'hotel') syncBookingToStays(blank);
+      sortBookings();
       saveTrip();
       renderBookings();
-      // Re-sync stays with old data
-      if (snapshot.category === 'hotel') syncBookingToStays(snapshot);
-    });
-  });
+      renderPlaces();
+      showUndoToast('Booking added', () => {
+        const i = trip.bookings.indexOf(blank);
+        if (i >= 0) {
+          if (blank.category === 'hotel') removeBookingStays(blank);
+          trip.bookings.splice(i, 1);
+          saveTrip();
+          renderBookings();
+          renderPlaces();
+        }
+      });
+    },
+    null
+  );
 }
 
 // Sync hotel booking dates/name to matching day.stay entries
@@ -1553,204 +1847,28 @@ function syncBookingToStays(hotelBooking) {
   if (!ci || !co) return;
 
   trip.days.forEach(day => {
-    const dayDate = day.date;
-    // Day falls within this hotel stay (check-in date up to but not including check-out)
-    if (dayDate >= ci && dayDate < co) {
+    if (day.date >= ci && day.date < co) {
       day.stay = day.stay || {};
       day.stay.hotel = hotelBooking.title;
       day.stay.confirmation = hotelBooking.confirmation || '';
-      // First line of notes is typically room type
       const firstNote = (hotelBooking.notes || '').split('\n')[0];
       if (firstNote) day.stay.room = firstNote;
     }
   });
 }
 
-// ===================================================================
-//  Add New Booking
-// ===================================================================
+// Remove day.stay entries for a deleted hotel booking
+function removeBookingStays(hotelBooking) {
+  if (hotelBooking.category !== 'hotel') return;
+  const ci = hotelBooking.checkIn;
+  const co = hotelBooking.checkOut;
+  if (!ci || !co) return;
 
-function openNewBookingForm() {
-  const grid = $('#booking-grid');
-  const addBtn = $('#booking-add-btn');
-  if (!addBtn || grid.querySelector('.booking-new-form')) return;
-
-  addBtn.style.display = 'none';
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'booking-new-form';
-
-  wrapper.innerHTML = `
-    <div class="bnf-step bnf-pick-type">
-      <h4>New Booking</h4>
-      <p class="bnf-hint">What type?</p>
-      <div class="bnf-type-btns">
-        <button class="btn btn-outline bnf-type-btn" data-cat="hotel">${ICONS.hotel} Hotel</button>
-        <button class="btn btn-outline bnf-type-btn" data-cat="flight">${ICONS.plane} Flight</button>
-        <button class="btn btn-outline bnf-type-btn" data-cat="rail">${ICONS.train} Rail</button>
-      </div>
-      <button class="btn btn-outline btn-xs bnf-cancel-btn">Cancel</button>
-    </div>`;
-
-  grid.appendChild(wrapper);
-  wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  // Cancel
-  wrapper.querySelector('.bnf-cancel-btn').addEventListener('click', () => {
-    wrapper.remove();
-    addBtn.style.display = '';
-  });
-
-  // Pick type → show form
-  wrapper.querySelectorAll('.bnf-type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const cat = btn.dataset.cat;
-      showNewBookingFields(wrapper, addBtn, cat);
-    });
-  });
-}
-
-function showNewBookingFields(wrapper, addBtn, category) {
-  const blank = {
-    category,
-    icon: category === 'flight' ? 'plane' : category === 'rail' ? 'train' : 'hotel',
-    title: '',
-    colorKey: 'transit',
-    confirmation: '',
-    cost: '',
-    notes: '',
-    url: '',
-  };
-  if (category === 'hotel') { blank.checkIn = ''; blank.checkOut = ''; }
-  if (category === 'flight') { blank.outbound = {}; blank.inbound = {}; }
-  if (category === 'rail') { blank.legs = []; }
-
-  let fields = '';
-  if (category === 'hotel') fields = buildHotelForm(blank);
-  else if (category === 'flight') fields = buildFlightForm(blank);
-  else if (category === 'rail') fields = buildRailForm(blank);
-
-  // Place picker
-  const placeOptions = Object.entries(trip.places)
-    .map(([key, p]) => `<option value="${key}">${p.emoji} ${p.name}</option>`)
-    .join('');
-
-  wrapper.innerHTML = `
-    <form class="booking-edit-form">
-      <h4>New ${category === 'flight' ? 'Flight' : category === 'rail' ? 'Rail' : 'Hotel'}</h4>
-      <div class="bef-field">
-        <label>Place</label>
-        <select name="colorKey" class="bef-select">${placeOptions}</select>
-      </div>
-      ${fields}
-      <div class="bef-actions">
-        <button type="submit" class="btn btn-primary btn-sm">Add</button>
-        <button type="button" class="btn btn-outline btn-sm bnf-cancel-btn">Cancel</button>
-      </div>
-    </form>`;
-
-  // Auto-calc nights (hotel)
-  if (category === 'hotel') {
-    const ciInput = wrapper.querySelector('input[name="checkIn"]');
-    const coInput = wrapper.querySelector('input[name="checkOut"]');
-    const nightsInput = wrapper.querySelector('input[name="_nights"]');
-    if (ciInput && coInput && nightsInput) {
-      const updateNights = () => {
-        const n = calcNights(ciInput.value, coInput.value);
-        nightsInput.value = n > 0 ? n : '';
-      };
-      ciInput.addEventListener('change', updateNights);
-      coInput.addEventListener('change', updateNights);
+  trip.days.forEach(day => {
+    if (day.date >= ci && day.date < co && day.stay?.hotel === hotelBooking.title) {
+      day.stay = null;
     }
-  }
-
-  // Rail leg management
-  if (category === 'rail') {
-    const legsList = wrapper.querySelector('#bef-legs-list');
-    wrapper.querySelector('.bef-add-leg')?.addEventListener('click', () => {
-      const i = legsList.children.length;
-      const row = document.createElement('div');
-      row.className = 'bef-row bef-leg-row';
-      row.dataset.legIdx = i;
-      row.innerHTML = `
-        <div class="bef-field"><input type="date" name="leg_date_${i}" value=""></div>
-        <div class="bef-field bef-field-grow"><input type="text" name="leg_route_${i}" value="" placeholder="City A → City B"></div>
-        <button type="button" class="bef-leg-remove btn btn-outline btn-xs" data-leg="${i}" title="Remove">×</button>`;
-      legsList.appendChild(row);
-    });
-    legsList?.addEventListener('click', (e) => {
-      if (e.target.classList.contains('bef-leg-remove')) {
-        e.target.closest('.bef-leg-row').remove();
-      }
-    });
-  }
-
-  // Cancel
-  wrapper.querySelector('.bnf-cancel-btn').addEventListener('click', () => {
-    wrapper.remove();
-    addBtn.style.display = '';
   });
-
-  // Submit — create the booking
-  wrapper.querySelector('form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-
-    const newBooking = { ...blank };
-    newBooking.title = fd.get('title')?.toString().trim() || 'Untitled';
-    newBooking.colorKey = fd.get('colorKey')?.toString() || 'transit';
-    newBooking.url = fd.get('url')?.toString().trim() || '';
-    newBooking.confirmation = fd.get('confirmation')?.toString().trim() || '';
-    newBooking.cost = fd.get('cost')?.toString().trim() || '';
-    newBooking.notes = fd.get('notes')?.toString().trim() || '';
-
-    if (category === 'hotel') {
-      newBooking.checkIn = fd.get('checkIn') || '';
-      newBooking.checkOut = fd.get('checkOut') || '';
-    } else if (category === 'flight') {
-      newBooking.outbound = {
-        flight: fd.get('out_flight')?.toString().trim() || '',
-        departAirport: fd.get('out_departAirport')?.toString().trim().toUpperCase() || '',
-        arriveAirport: fd.get('out_arriveAirport')?.toString().trim().toUpperCase() || '',
-        departDate: fd.get('out_departDate') || '',
-        departTime: fd.get('out_departTime') || '',
-        arriveDate: fd.get('out_arriveDate') || '',
-        arriveTime: fd.get('out_arriveTime') || '',
-      };
-      newBooking.inbound = {
-        flight: fd.get('in_flight')?.toString().trim() || '',
-        departAirport: fd.get('in_departAirport')?.toString().trim().toUpperCase() || '',
-        arriveAirport: fd.get('in_arriveAirport')?.toString().trim().toUpperCase() || '',
-        departDate: fd.get('in_departDate') || '',
-        departTime: fd.get('in_departTime') || '',
-        arriveDate: fd.get('in_arriveDate') || '',
-        arriveTime: fd.get('in_arriveTime') || '',
-      };
-    } else if (category === 'rail') {
-      const legRows = wrapper.querySelectorAll('.bef-leg-row');
-      newBooking.legs = [];
-      legRows.forEach(row => {
-        const i = row.dataset.legIdx;
-        const date = fd.get(`leg_date_${i}`)?.toString() || '';
-        const route = fd.get(`leg_route_${i}`)?.toString().trim() || '';
-        if (date || route) newBooking.legs.push({ date, route });
-      });
-    }
-
-    trip.bookings.push(newBooking);
-    if (category === 'hotel') syncBookingToStays(newBooking);
-    saveTrip();
-    renderBookings();
-
-    const addedIdx = trip.bookings.length - 1;
-    showUndoToast('Booking added', () => {
-      trip.bookings.splice(addedIdx, 1);
-      saveTrip();
-      renderBookings();
-    });
-  });
-
-  wrapper.querySelector('input[name="title"]')?.focus();
 }
 
 function escHtml(str) {
@@ -2252,6 +2370,32 @@ async function init() {
     saveTrip();
   }
 
+  // Migrate rail bookings from legs[] to flat fields
+  if (trip.bookings?.length) {
+    const expanded = [];
+    trip.bookings.forEach(b => {
+      if (b.category === 'rail' && b.legs?.length && !b.transitDate) {
+        b.legs.forEach(leg => {
+          const parts = (leg.route || '').split(/\s*→\s*/);
+          expanded.push({
+            category: 'rail', icon: 'train',
+            title: leg.route || b.title,
+            colorKey: b.colorKey || 'transit',
+            confirmation: b.confirmation || '', cost: '', notes: '', url: '',
+            transitDate: leg.date || '', transitTime: '',
+            transitFrom: parts[0] || '', transitTo: parts[1] || '',
+          });
+        });
+      } else {
+        expanded.push(b);
+      }
+    });
+    if (expanded.length !== trip.bookings.length) {
+      trip.bookings = expanded;
+      saveTrip();
+    }
+  }
+
   userEdits = loadEdits();
 
   // Migrate from v3 edits if present
@@ -2281,6 +2425,7 @@ async function init() {
   renderRouteMap();
   renderFilterBar();
   renderDayList('all');
+  renderBookingFilters();
   renderBookings();
   renderCountdown();
   initStickyNav();
@@ -2291,15 +2436,24 @@ async function init() {
   initExportImport();
   updateMobileNav();
 
+  // Booking add button
+  const addTopBtn = $('#booking-add-top');
+  if (addTopBtn) addTopBtn.addEventListener('click', () => openNewBookingForm());
+
   // Panel close handlers
   const panel = $('#day-panel');
   if (panel) {
     panel.querySelector('.day-panel-close').addEventListener('click', closeDayPanel);
     panel.querySelector('.day-panel-backdrop').addEventListener('click', closeDayPanel);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && panel.classList.contains('open')) closeDayPanel();
-    });
   }
+
+  // Escape key for any open panel
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const bp = $('#booking-panel');
+    if (bp?.classList.contains('open')) { bp.classList.remove('open'); return; }
+    if (panel?.classList.contains('open')) closeDayPanel();
+  });
 
   // Mobile nav scroll update
   let scrollTimer;

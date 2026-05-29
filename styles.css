@@ -1475,6 +1475,321 @@ img { display: block; max-width: 100%; }
   padding: 0 6px;
 }
 
+/* ================================================
+   V4: BOOKING TOOLBAR & FILTERS
+   ================================================ */
+
+.booking-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.booking-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.booking-add-top-btn {
+  flex-shrink: 0;
+}
+
+/* ================================================
+   V4: BOOKING PLACE GROUP HEADER
+   ================================================ */
+
+.booking-place-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 6px;
+  margin-top: 16px;
+  border-bottom: 2px solid var(--bph-color, var(--border));
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.booking-place-header:first-child {
+  margin-top: 0;
+}
+
+.booking-place-emoji {
+  font-size: 1rem;
+}
+
+/* ================================================
+   V4: BOOKING EMPTY STATE
+   ================================================ */
+
+.booking-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* ================================================
+   V4: BOOKING PANEL (slide-out editor)
+   ================================================ */
+
+.booking-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 510;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.booking-panel.open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.booking-panel-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(28,25,23,.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.booking-panel-content {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(500px, 92vw);
+  background: var(--bg);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%);
+  transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.booking-panel.open .booking-panel-content {
+  transform: translateX(0);
+}
+
+.booking-panel-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  z-index: 2;
+}
+
+.booking-panel-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-serif);
+}
+
+.booking-panel-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.booking-panel-close:hover {
+  background: var(--bg-section);
+  color: var(--ink);
+}
+
+.booking-panel-body {
+  flex: 1;
+  padding: 16px 20px 40px;
+}
+
+/* ================================================
+   V4: BOOKING PANEL FORM (bpf-*)
+   ================================================ */
+
+.bpf {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bpf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bpf-field label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bpf-req {
+  color: var(--vermillion);
+  font-weight: 400;
+}
+
+.bpf-field input,
+.bpf-field textarea,
+.bpf-select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.bpf-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.bpf-field input:focus,
+.bpf-field textarea:focus,
+.bpf-select:focus {
+  outline: none;
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(30,58,95,.1);
+}
+
+.bpf-readonly {
+  background: var(--bg-section) !important;
+  color: var(--ink-muted) !important;
+  cursor: default;
+}
+
+.bpf-row {
+  display: flex;
+  gap: 10px;
+}
+
+.bpf-row .bpf-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.bpf-field-sm {
+  max-width: 80px;
+  flex: 0 0 80px !important;
+}
+
+.bpf-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bpf-fieldset legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  padding: 0 6px;
+}
+
+.bpf-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 6px;
+}
+
+.bpf-hint {
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+/* ================================================
+   V4: BOOKING TYPE PICKER GRID
+   ================================================ */
+
+.bpf-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.bpf-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  transition: all var(--transition);
+}
+
+.bpf-type-btn svg {
+  width: 28px;
+  height: 28px;
+  color: var(--indigo);
+}
+
+.bpf-type-btn:hover {
+  border-color: var(--indigo);
+  background: var(--indigo-light);
+}
+
+/* ================================================
+   V4: BOOKING FOOTER — maps + edit links
+   ================================================ */
+
+.booking-footer-maps {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--bamboo);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: opacity var(--transition);
+}
+
+.booking-footer-maps:hover { opacity: .7; }
+.booking-footer-maps svg { width: 14px; height: 14px; }
+
 /* Rail leg rows */
 .bef-leg-row {
   align-items: center;
@@ -3438,6 +3753,25 @@ a:hover .maps-link-icon { opacity: .7; }
 
   .day-panel-content {
     width: 100vw;
+  }
+
+  .booking-panel-content {
+    width: 100vw;
+  }
+
+  .bpf-type-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .bpf-type-btn {
+    padding: 18px 8px;
+    font-size: 0.82rem;
+  }
+
+  .bpf-type-btn svg {
+    width: 24px;
+    height: 24px;
   }
 
   .filter-bar {

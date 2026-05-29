@@ -524,19 +524,72 @@
     {
       "category": "rail",
       "icon": "train",
-      "title": "Intercity Trains",
-      "colorKey": "transit",
+      "title": "Tokyo → Fujikawaguchiko",
+      "colorKey": "tokyo",
       "confirmation": "",
       "cost": "",
-      "legs": [
-        {"date": "2026-06-14", "route": "Tokyo → Fujikawaguchiko"},
-        {"date": "2026-06-15", "route": "Mt. Fuji area → Kyoto"},
-        {"date": "2026-06-17", "route": "Kyoto → Kobe"},
-        {"date": "2026-06-19", "route": "Kobe → Hiroshima (Shinkansen)"},
-        {"date": "2026-06-22", "route": "Hiroshima → Tokyo (Shinkansen)"}
-      ],
+      "transitDate": "2026-06-14",
+      "transitTime": "",
+      "transitFrom": "Tokyo",
+      "transitTo": "Fujikawaguchiko",
       "notes": "",
-      "url": "https://www.google.com/maps/dir/Tokyo/Mount+Fuji/Kyoto/Kobe/Hiroshima/Tokyo"
+      "url": ""
+    },
+    {
+      "category": "rail",
+      "icon": "train",
+      "title": "Mt. Fuji → Kyoto",
+      "colorKey": "fuji",
+      "confirmation": "",
+      "cost": "",
+      "transitDate": "2026-06-15",
+      "transitTime": "",
+      "transitFrom": "Mt. Fuji area",
+      "transitTo": "Kyoto",
+      "notes": "",
+      "url": ""
+    },
+    {
+      "category": "rail",
+      "icon": "train",
+      "title": "Kyoto → Kobe",
+      "colorKey": "kyoto",
+      "confirmation": "",
+      "cost": "",
+      "transitDate": "2026-06-17",
+      "transitTime": "",
+      "transitFrom": "Kyoto",
+      "transitTo": "Kobe",
+      "notes": "",
+      "url": ""
+    },
+    {
+      "category": "rail",
+      "icon": "train",
+      "title": "Kobe → Hiroshima",
+      "colorKey": "kobe",
+      "confirmation": "",
+      "cost": "",
+      "transitDate": "2026-06-19",
+      "transitTime": "",
+      "transitFrom": "Kobe",
+      "transitTo": "Hiroshima",
+      "notes": "Shinkansen",
+      "url": ""
+    },
+    {
+      "category": "rail",
+      "icon": "train",
+      "title": "Hiroshima → Tokyo",
+      "colorKey": "hiroshima",
+      "confirmation": "",
+      "cost": "",
+      "transitDate": "2026-06-22",
+      "transitTime": "",
+      "transitFrom": "Hiroshima",
+      "transitTo": "Tokyo",
+      "notes": "Shinkansen",
+      "url": ""
     }
   ]
 }

@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body class="is-trip">
 
@@ -103,9 +103,25 @@
           <span class="label">Confirmations</span>
           <h2>Bookings</h2>
         </div>
+        <div class="booking-toolbar" id="booking-toolbar">
+          <div class="booking-filters" id="booking-filters" role="group" aria-label="Filter bookings"></div>
+          <button class="btn btn-primary btn-sm booking-add-top-btn" id="booking-add-top">+ Add</button>
+        </div>
         <div class="booking-grid" id="booking-grid"></div>
       </div>
     </section>
+
+    <!-- Booking Panel (slide-in) -->
+    <aside class="booking-panel" id="booking-panel">
+      <div class="booking-panel-backdrop"></div>
+      <div class="booking-panel-content">
+        <header class="booking-panel-header">
+          <h3 class="booking-panel-title">Edit Booking</h3>
+          <button class="booking-panel-close" id="booking-panel-close" title="Close">&times;</button>
+        </header>
+        <div class="booking-panel-body" id="booking-panel-body"></div>
+      </div>
+    </aside>
 
     <!-- Bulk Add Button -->
     <div class="bulk-trigger">
@@ -206,13 +222,19 @@
           <label>Place name</label>
           <input type="text" name="name" class="apm-name" placeholder="e.g. Osaka, Nara Park..." required>
         </div>
-        <div class="apm-field">
-          <label>Dates</label>
-          <input type="text" name="dates" placeholder="e.g. Jun 18–19">
-        </div>
-        <div class="apm-field">
-          <label>Nights</label>
-          <input type="number" name="nights" value="1" min="0" max="30">
+        <div class="apm-row">
+          <div class="apm-field">
+            <label>Start date</label>
+            <input type="date" name="startDate" class="apm-start">
+          </div>
+          <div class="apm-field">
+            <label>End date</label>
+            <input type="date" name="endDate" class="apm-end">
+          </div>
+          <div class="apm-field" style="max-width:70px">
+            <label>Nights</label>
+            <input type="number" name="nights" class="apm-nights" value="1" min="0" max="30" readonly style="background:var(--bg-section);color:var(--ink-muted)">
+          </div>
         </div>
         <div class="apm-row">
           <div class="apm-field">
@@ -254,6 +276,6 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
