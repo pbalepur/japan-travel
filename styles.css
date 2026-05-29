@@ -2925,7 +2925,7 @@ a:hover .maps-link-icon { opacity: .7; }
 .bulk-modal {
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: 600; /* must be above Leaflet map (400) and panels (500-510) */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2947,7 +2947,7 @@ a:hover .maps-link-icon { opacity: .7; }
   overflow-y: auto;
   padding: clamp(20px, 4vw, 32px);
   border-radius: var(--radius-lg);
-  background: var(--bg-card);
+  background: var(--bg); /* warm cream — matches booking panel bg pattern */
   box-shadow: var(--shadow-lg);
 }
 
@@ -3292,31 +3292,51 @@ a:hover .maps-link-icon { opacity: .7; }
 
 /* Add Place modal fields */
 .apm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin-bottom: 14px;
 }
 
 .apm-field label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--ink-muted);
-  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .apm-field input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 0.9rem;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
   font-family: var(--font-sans);
-  background: var(--bg);
+  background: var(--bg-card); /* white — matches booking panel input pattern */
+  color: var(--ink);
+  box-sizing: border-box;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
+.apm-field input:focus {
+  outline: none;
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(30,58,95,.1);
+}
+
+/* Flex row — all fields share one line (handles dates+nights and lat+lng) */
 .apm-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.apm-row .apm-field {
+  flex: 1;
+  min-width: 80px;
+  margin-bottom: 0; /* row handles spacing */
 }
 
 /* ================================================
