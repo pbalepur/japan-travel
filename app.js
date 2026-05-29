@@ -1090,31 +1090,25 @@ function initAddPlaceModal() {
     if (e.target === modal) closeAddPlaceModal();
   });
 
-  // Wire up date helpers for the modal
+  // Wire up date range picker for the add-place modal
+  const apmDateRange = modal.querySelector('.apm-date-range');
   const apmStart = modal.querySelector('.apm-start');
   const apmEnd = modal.querySelector('.apm-end');
   const apmNights = modal.querySelector('.apm-nights');
-  if (apmStart && apmEnd) {
+  if (apmDateRange && window.flatpickr) {
     const { min, max } = tripDateRange();
-    if (min) { apmStart.min = min; apmEnd.min = min; }
-    if (max) {
-      const maxPlus = new Date(max + 'T00:00:00');
-      maxPlus.setDate(maxPlus.getDate() + 1);
-      const mp = maxPlus.toISOString().slice(0, 10);
-      apmStart.max = mp;
-      apmEnd.max = mp;
-    }
-    apmStart.addEventListener('change', () => {
-      if (apmStart.value) apmEnd.min = apmStart.value;
-      if (apmStart.value && !apmEnd.value) {
-        const next = new Date(apmStart.value + 'T00:00:00');
-        next.setDate(next.getDate() + 1);
-        apmEnd.value = next.toISOString().slice(0, 10);
+    const maxPlus = max ? (() => { const d = new Date(max + 'T00:00:00'); d.setDate(d.getDate() + 1); return d; })() : null;
+    flatpickr(apmDateRange, {
+      mode: 'range',
+      dateFormat: 'M j, Y',
+      rangeSeparator: ' → ',
+      minDate: min || null,
+      maxDate: maxPlus || null,
+      onChange(selectedDates) {
+        apmStart.value = selectedDates[0] ? selectedDates[0].toISOString().slice(0, 10) : '';
+        apmEnd.value   = selectedDates[1] ? selectedDates[1].toISOString().slice(0, 10) : '';
+        if (apmNights) apmNights.value = calcNights(apmStart.value, apmEnd.value) || (apmStart.value ? 1 : '');
       }
-      if (apmNights) apmNights.value = calcNights(apmStart.value, apmEnd.value) || '';
-    });
-    apmEnd.addEventListener('change', () => {
-      if (apmNights) apmNights.value = calcNights(apmStart.value, apmEnd.value) || '';
     });
   }
 
@@ -1499,33 +1493,34 @@ function wireUpDateHelpers(form) {
     if (key && placeSel.value === '') placeSel.value = key;
   };
 
-  // Hotel check-in → check-out linking
-  const ci = form.querySelector('input[name="checkIn"]');
-  const co = form.querySelector('input[name="checkOut"]');
-  const nights = form.querySelector('input[name="_nights"]');
-  if (ci && co) {
-    const sync = () => {
-      if (ci.value) co.min = ci.value;
-      if (ci.value && !co.value) {
-        const next = new Date(ci.value + 'T00:00:00');
-        next.setDate(next.getDate() + 1);
-        co.value = next.toISOString().slice(0, 10);
+  // Hotel stay dates — single range picker
+  const rangeInput = form.querySelector('.bpf-date-range');
+  const ciHidden   = form.querySelector('input[name="checkIn"]');
+  const coHidden   = form.querySelector('input[name="checkOut"]');
+  const nights     = form.querySelector('input[name="_nights"]');
+  if (rangeInput && ciHidden && coHidden && window.flatpickr) {
+    const maxPlus = max ? (() => { const d = new Date(max + 'T00:00:00'); d.setDate(d.getDate() + 1); return d; })() : null;
+    const fp = flatpickr(rangeInput, {
+      mode: 'range',
+      dateFormat: 'M j, Y',
+      rangeSeparator: ' → ',
+      minDate: min || null,
+      maxDate: maxPlus || null,
+      onChange(selectedDates) {
+        ciHidden.value = selectedDates[0] ? selectedDates[0].toISOString().slice(0, 10) : '';
+        coHidden.value = selectedDates[1] ? selectedDates[1].toISOString().slice(0, 10) : '';
+        if (nights) nights.value = calcNights(ciHidden.value, coHidden.value) || '';
+        autoSuggestPlace(ciHidden.value);
       }
-      if (ci.value && co.value && co.value <= ci.value) {
-        const next = new Date(ci.value + 'T00:00:00');
-        next.setDate(next.getDate() + 1);
-        co.value = next.toISOString().slice(0, 10);
-      }
-      if (nights) {
-        const n = calcNights(ci.value, co.value);
-        nights.value = n || '';
-      }
-      autoSuggestPlace(ci.value);
-    };
-    ci.addEventListener('change', sync);
-    co.addEventListener('change', () => {
-      if (nights) { const n = calcNights(ci.value, co.value); nights.value = n || ''; }
     });
+    // Pre-fill existing dates — must parse to Date objects first;
+    // also fix the display value since setDate ignores rangeSeparator
+    if (ciHidden.value && coHidden.value) {
+      const d1 = fp.parseDate(ciHidden.value, 'Y-m-d');
+      const d2 = fp.parseDate(coHidden.value, 'Y-m-d');
+      fp.setDate([d1, d2]);
+      rangeInput.value = fp.selectedDates.map(d => fp.formatDate(d, fp.config.dateFormat)).join(fp.config.rangeSeparator);
+    }
   }
 
   // Transit date → auto-suggest place
@@ -1592,12 +1587,10 @@ function buildHotelFields(b) {
     </div>
     <div class="bpf-row">
       <div class="bpf-field">
-        <label>Check-in <span class="bpf-req">*</span></label>
-        <input type="date" name="checkIn" value="${b.checkIn || ''}" required min="${min}" max="${max}">
-      </div>
-      <div class="bpf-field">
-        <label>Check-out <span class="bpf-req">*</span></label>
-        <input type="date" name="checkOut" value="${b.checkOut || ''}" required min="${b.checkIn || min}">
+        <label>Stay dates <span class="bpf-req">*</span></label>
+        <input type="text" class="bpf-date-range" placeholder="Check-in → Check-out" autocomplete="off" readonly>
+        <input type="hidden" name="checkIn" value="${b.checkIn || ''}">
+        <input type="hidden" name="checkOut" value="${b.checkOut || ''}">
       </div>
       <div class="bpf-field bpf-field-sm">
         <label>Nights</label>

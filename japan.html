@@ -14,7 +14,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body class="is-trip">
 
@@ -224,12 +225,10 @@
         </div>
         <div class="apm-row">
           <div class="apm-field">
-            <label>Start date</label>
-            <input type="date" name="startDate" class="apm-start">
-          </div>
-          <div class="apm-field">
-            <label>End date</label>
-            <input type="date" name="endDate" class="apm-end">
+            <label>Dates</label>
+            <input type="text" class="apm-date-range" placeholder="Start → End" autocomplete="off" readonly>
+            <input type="hidden" name="startDate" class="apm-start">
+            <input type="hidden" name="endDate" class="apm-end">
           </div>
           <div class="apm-field" style="max-width:70px">
             <label>Nights</label>
@@ -276,6 +275,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=14"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>
