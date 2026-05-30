@@ -2772,17 +2772,22 @@ async function init() {
   }
 
   // Migration v2: remove hardcoded flight travel from day objects
-  // (flights now cross-reference from trip.bookings[] automatically)
   if ((trip.meta?.version || 1) < 2) {
-    let changed = false;
-    trip.days.forEach(d => {
-      if (d.travel?.mode === 'flight') {
-        delete d.travel;
-        changed = true;
-      }
-    });
+    trip.days.forEach(d => { if (d.travel?.mode === 'flight') delete d.travel; });
     trip.meta.version = 2;
-    if (changed) saveTrip();
+    saveTrip();
+  }
+
+  // Migration v3: remove all day.travel + logistical schedule items
+  // (travel now comes from bookings cross-reference; no UI to delete day.travel manually)
+  if ((trip.meta?.version || 1) < 3) {
+    const LOGISTICAL = new Set(['flight', 'hotel', 'taxi', 'train', 'bus']);
+    trip.days.forEach(d => {
+      delete d.travel;
+      if (d.schedule?.length) d.schedule = d.schedule.filter(it => !LOGISTICAL.has(it.type));
+    });
+    trip.meta.version = 3;
+    saveTrip();
   }
 
   // Render everything
