@@ -1734,7 +1734,7 @@ img { display: block; max-width: 100%; }
 .booking-panel {
   position: fixed;
   inset: 0;
-  z-index: 510;
+  z-index: 1030;
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;
@@ -2157,7 +2157,7 @@ select {
   justify-content: center;
   box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   cursor: pointer;
-  z-index: 900;
+  z-index: 1080;
   transition: transform 0.2s, box-shadow 0.2s;
   border: none;
 }
@@ -3082,7 +3082,7 @@ a:hover .maps-link-icon { opacity: .7; }
   color: #fffdf8;
   font-size: 0.88rem;
   font-weight: 600;
-  z-index: 620;
+  z-index: 1060;
   opacity: 0;
   transition: all 300ms ease;
   pointer-events: none;
@@ -3377,7 +3377,7 @@ a:hover .maps-link-icon { opacity: .7; }
 .day-panel {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: 1020;
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;
@@ -4335,7 +4335,7 @@ span.flatpickr-weekday { background: transparent; color: var(--ink-faint); font-
 .iep-panel {
   position: fixed;
   inset: 0;
-  z-index: 515;
+  z-index: 1040;
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;
