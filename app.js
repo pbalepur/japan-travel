@@ -552,7 +552,7 @@ function renderPlacesEditStrip() {
   ).size;
   strip.innerHTML = `
     <span class="pes-summary">${nights} nights · ${places} place${places !== 1 ? 's' : ''}</span>
-    <button class="btn btn-dark btn-sm" id="pes-edit-btn">✎ Edit Itinerary</button>
+    <button class="btn btn-dark btn-sm" id="pes-edit-btn">✎ Edit Journey</button>
   `;
   strip.querySelector('#pes-edit-btn')?.addEventListener('click', openIEP);
 }
@@ -845,23 +845,23 @@ function renderIEPDatesStrip() {
   let statusClass, statusText;
   if (gap === 0) {
     statusClass = 'iep-status-ok';
-    statusText  = `${alloc} of ${pool} · Balanced`;
+    statusText  = `${alloc} of ${pool} nights · Balanced`;
   } else if (gap > 0) {
     statusClass = 'iep-status-warn';
-    statusText  = `${alloc} of ${pool} · ${gap} gap`;
+    statusText  = `${alloc} of ${pool} nights · ${gap} unallocated`;
   } else {
     statusClass = 'iep-status-err';
-    statusText  = `${alloc} of ${pool} · ${Math.abs(gap)} over`;
+    statusText  = `${alloc} of ${pool} nights · ${Math.abs(gap)} over`;
   }
 
   el.innerHTML = `
     <div class="iep-date-field">
-      <span class="iep-date-label">Depart</span>
+      <span class="iep-date-label">Leave home</span>
       <input type="text" class="iep-date-input" id="iep-depart-fp" readonly>
     </div>
     <span class="iep-dates-sep">→</span>
     <div class="iep-date-field">
-      <span class="iep-date-label">Return</span>
+      <span class="iep-date-label">Return home</span>
       <input type="text" class="iep-date-input" id="iep-return-fp" readonly>
     </div>
     <div class="iep-status ${statusClass}"><span class="iep-status-dot"></span>${statusText}</div>

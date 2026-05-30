@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=26">
+  <link rel="stylesheet" href="styles.css?v=27">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body class="is-trip">
@@ -78,8 +78,8 @@
     <section class="section route-section" id="route">
       <div class="container">
         <div class="section-intro">
-          <span class="label">The Route</span>
-          <h2>Places</h2>
+          <span class="label">Places</span>
+          <h2>The Route</h2>
           <p class="section-desc">Tap a place to filter its days in the itinerary.</p>
         </div>
         <div id="route-map" class="route-map"></div>
@@ -92,8 +92,8 @@
     <section class="section itinerary-section" id="itinerary">
       <div class="container">
         <div class="section-intro">
-          <span class="label">Day by Day</span>
-          <h2>Itinerary</h2>
+          <span class="label">Itinerary</span>
+          <h2>Day by Day</h2>
         </div>
         <div class="filter-bar" id="filter-bar" role="group" aria-label="Filter days"></div>
         <div class="day-list" id="day-list"></div>
@@ -104,8 +104,8 @@
     <section class="section bookings-section" id="bookings">
       <div class="container">
         <div class="section-intro">
-          <span class="label">Confirmations</span>
-          <h2>Bookings</h2>
+          <span class="label">Bookings</span>
+          <h2>Confirmations</h2>
         </div>
         <div class="booking-toolbar" id="booking-toolbar">
           <div class="booking-filters" id="booking-filters" role="group" aria-label="Filter bookings"></div>
@@ -220,12 +220,12 @@
     </div>
   </aside>
 
-  <!-- IEP — Itinerary Edit Panel (slide-in from right) -->
-  <aside class="iep-panel" id="iep-panel" role="dialog" aria-label="Edit itinerary">
+  <!-- IEP — Journey Edit Panel (slide-in from right) -->
+  <aside class="iep-panel" id="iep-panel" role="dialog" aria-label="Edit journey">
     <div class="iep-backdrop" id="iep-backdrop"></div>
     <div class="iep-content">
       <header class="iep-header">
-        <h3 class="iep-title">Edit Itinerary</h3>
+        <h3 class="iep-title">Edit Journey</h3>
         <button class="iep-close" id="iep-close" aria-label="Close">&times;</button>
       </header>
       <div class="iep-dates-strip" id="iep-dates-strip"></div>
@@ -316,6 +316,6 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>
