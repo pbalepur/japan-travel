@@ -556,15 +556,17 @@ function applyIEPChanges() {
   curDate.setDate(curDate.getDate() + 1);
   dayNum = 2;
 
-  // Destination segments
+  // Destination segments (cumulative per-place counter for correct "Tokyo Day 5" etc.)
+  const placeLocalN = {};
   for (const seg of iepSegments) {
     const rIdx = newRuns[seg.key] || 0;
     newRuns[seg.key] = rIdx + 1;
     for (let li = 0; li < seg.nights; li++) {
       const existing = contentMap[`${seg.key}:${rIdx}:${li}`];
+      placeLocalN[seg.key] = (placeLocalN[seg.key] || 0) + 1;
       newDays.push({
         dayNum, date: curDate.toISOString().slice(0, 10), placeKey: seg.key,
-        title:    defaultDayTitle(seg.key, li + 1),
+        title:    defaultDayTitle(seg.key, placeLocalN[seg.key]),
         stay:     existing?.stay     || null,
         schedule: existing?.schedule || [],
         wishlist: existing?.wishlist || [],
@@ -3354,15 +3356,26 @@ async function init() {
     saveTrip();
   }
 
-  // Migration v4: auto-generate day titles as "<Place> Day N" (run-local numbering)
+  // Migration v4: auto-generate day titles as "<Place> Day N" (cumulative per place)
   if ((trip.meta?.version || 1) < 4) {
-    let lastKey = null, localN = 0;
+    const perPlaceN = {};
     trip.days.forEach(d => {
-      if (d.placeKey !== lastKey) { lastKey = d.placeKey; localN = 1; }
-      else localN++;
-      d.title = defaultDayTitle(d.placeKey, localN);
+      perPlaceN[d.placeKey] = (perPlaceN[d.placeKey] || 0) + 1;
+      d.title = defaultDayTitle(d.placeKey, perPlaceN[d.placeKey]);
     });
     trip.meta.version = 4;
+    saveTrip();
+  }
+
+  // Migration v5: fix day numbering for places that appear more than once
+  // (v4 titles used a run-reset counter — "Tokyo Day 1" on second visit instead of "Tokyo Day 5")
+  if ((trip.meta?.version || 1) < 5) {
+    const perPlaceN = {};
+    trip.days.forEach(d => {
+      perPlaceN[d.placeKey] = (perPlaceN[d.placeKey] || 0) + 1;
+      d.title = defaultDayTitle(d.placeKey, perPlaceN[d.placeKey]);
+    });
+    trip.meta.version = 5;
     saveTrip();
   }
 
