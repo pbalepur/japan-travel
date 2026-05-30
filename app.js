@@ -1698,6 +1698,28 @@ async function initInbox() {
   pendingBookings = await fetchPending();
   renderInbox(pendingBookings);
   updateInboxBadge(pendingBookings.length);
+
+  // Poll every 30s for new bookings, but only when the page is visible
+  setInterval(async () => {
+    if (document.visibilityState !== 'visible') return;
+    const fresh = await fetchPending();
+    if (JSON.stringify(fresh) !== JSON.stringify(pendingBookings)) {
+      pendingBookings = fresh;
+      renderInbox(pendingBookings);
+      updateInboxBadge(pendingBookings.length);
+    }
+  }, 30_000);
+
+  // Also refresh immediately when the user switches back to this tab
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    const fresh = await fetchPending();
+    if (JSON.stringify(fresh) !== JSON.stringify(pendingBookings)) {
+      pendingBookings = fresh;
+      renderInbox(pendingBookings);
+      updateInboxBadge(pendingBookings.length);
+    }
+  });
 }
 
 // ===================================================================
