@@ -4691,7 +4691,9 @@ body.is-readonly .places-edit-strip,
 body.is-readonly .bulk-trigger,
 body.is-readonly .import-label,
 body.is-readonly #booking-add-top,
-body.is-readonly .booking-toolbar-actions { display: none !important; }
+body.is-readonly .booking-toolbar-actions,
+body.is-readonly .city-card-add,
+body.is-readonly .iep-add-place { display: none !important; }
 
 /* Disable booking row hover/click affordance in view-only mode */
 body.is-readonly .bm-row {

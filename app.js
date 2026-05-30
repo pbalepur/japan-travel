@@ -606,7 +606,7 @@ function renderPlacesNormal(cityNav) {
   });
 
   const addBtn = $('#add-place-btn');
-  if (addBtn) addBtn.addEventListener('click', openAddPlaceModal);
+  if (addBtn) addBtn.addEventListener('click', () => { if (isEditMode()) openAddPlaceModal(); });
 }
 
 // ── Segment helpers ───────────────────────────────────────────────────────────
