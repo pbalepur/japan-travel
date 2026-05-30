@@ -134,6 +134,7 @@ function getRouteSegmentDays(routeIdx) {
 
 const STORE_KEY = 'raahi_v4_trip';
 const EDITS_KEY = 'raahi_v4_edits';
+const TRIP_ID   = 'japan-2026';
 
 let trip = null;       // The full trip data
 let userEdits = {};    // User overrides per day
@@ -156,8 +157,39 @@ function loadTrip() {
   return null;
 }
 
-function saveTrip() {
+// Write to localStorage only — used during migrations and silent refreshes
+function saveLocal() {
   localStorage.setItem(STORE_KEY, JSON.stringify(trip));
+}
+
+// Write to localStorage + push to remote — used for explicit user edits
+function saveTrip() {
+  if (!trip.meta) trip.meta = {};
+  trip.meta.savedAt = new Date().toISOString();
+  saveLocal();
+  pushTripToWorker();
+}
+
+// Fire-and-forget push to Cloudflare KV
+function pushTripToWorker() {
+  fetch(`${WORKER_URL}/api/trip/${TRIP_ID}/data`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(trip),
+  }).catch(() => {});
+}
+
+// Fetch full trip data from Cloudflare KV (returns null on failure or 404)
+async function fetchRemoteTrip() {
+  try {
+    const res = await fetch(`${WORKER_URL}/api/trip/${TRIP_ID}/data`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 function loadEdits() {
@@ -3240,19 +3272,29 @@ function showUndoToast(msg, undoFn) {
 // ===================================================================
 
 async function init() {
-  // Load trip data: localStorage override > fetch
-  trip = loadTrip();
+  // Load trip: race localStorage against Cloudflare KV, use whichever is newer
+  const local  = loadTrip();
+  const remote = await fetchRemoteTrip();
+
+  if (local && remote) {
+    // Both exist — pick the one saved most recently
+    trip = (remote.meta?.savedAt || '') > (local.meta?.savedAt || '') ? remote : local;
+  } else {
+    trip = local || remote || null;
+  }
 
   if (!trip) {
+    // Cold start — fall back to bundled trip.json
     try {
       const res = await fetch('./trip.json');
       trip = await res.json();
-      saveTrip();
-    } catch (err) {
+    } catch {
       document.body.innerHTML = '<div style="padding:40px;text-align:center"><h2>Failed to load trip data</h2><p>Could not fetch trip.json</p></div>';
       return;
     }
   }
+
+  saveLocal(); // persist the winner to localStorage (no remote push yet)
 
   // Migrate bookings from old details-array format to structured schema
   if (trip.bookings?.length && trip.bookings[0].details && !trip.bookings[0].category) {
@@ -3284,7 +3326,7 @@ async function init() {
         };
       }
     });
-    saveTrip();
+    saveLocal();
   }
 
   // Migrate rail bookings from legs[] to flat fields
@@ -3309,7 +3351,7 @@ async function init() {
     });
     if (expanded.length !== trip.bookings.length) {
       trip.bookings = expanded;
-      saveTrip();
+      saveLocal();
     }
   }
 
@@ -3341,7 +3383,7 @@ async function init() {
   if ((trip.meta?.version || 1) < 2) {
     trip.days.forEach(d => { if (d.travel?.mode === 'flight') delete d.travel; });
     trip.meta.version = 2;
-    saveTrip();
+    saveLocal();
   }
 
   // Migration v3: remove all day.travel + logistical schedule items
@@ -3353,7 +3395,7 @@ async function init() {
       if (d.schedule?.length) d.schedule = d.schedule.filter(it => !LOGISTICAL.has(it.type));
     });
     trip.meta.version = 3;
-    saveTrip();
+    saveLocal();
   }
 
   // Migration v4: auto-generate day titles as "<Place> Day N" (cumulative per place)
@@ -3364,7 +3406,7 @@ async function init() {
       d.title = defaultDayTitle(d.placeKey, perPlaceN[d.placeKey]);
     });
     trip.meta.version = 4;
-    saveTrip();
+    saveLocal();
   }
 
   // Migration v5: fix day numbering for places that appear more than once
@@ -3376,7 +3418,7 @@ async function init() {
       d.title = defaultDayTitle(d.placeKey, perPlaceN[d.placeKey]);
     });
     trip.meta.version = 5;
-    saveTrip();
+    saveLocal();
   }
 
   // Render everything
