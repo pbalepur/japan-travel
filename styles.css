@@ -4272,3 +4272,10 @@ span.flatpickr-weekday { background: transparent; color: var(--ink-faint); font-
 .inbox-empty-body strong { font-size: 0.88rem; color: var(--ink); display: block; margin-bottom: 4px; }
 .inbox-empty-body p { font-size: 0.78rem; color: var(--ink-muted); margin: 0 0 10px; line-height: 1.5; }
 
+/* Booking-linked stay / travel — subtle indicator that it came from Bookings */
+.stay-badge-linked,
+.travel-card-linked {
+  border-left: 3px solid var(--indigo-light);
+  padding-left: 10px;
+}
+

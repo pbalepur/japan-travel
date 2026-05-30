@@ -555,8 +555,15 @@ function renderDayList(filter = 'all') {
     const schedule = getSchedule(idx);
     const wishlist = getWishlist(idx);
     const totalCount = schedule.length + wishlist.length;
-    const hotelName = day.stay?.hotel || 'In transit';
-    const hasTravel = day.travel != null;
+
+    // Stay: explicit day data takes priority, fall back to booking lookup
+    const stayBooking = !day.stay ? getStayBookingForDate(day.date) : null;
+    const hotelName = day.stay?.hotel || stayBooking?.title || 'In transit';
+
+    // Travel: explicit day data takes priority, fall back to booking lookup
+    const travelBooking = !day.travel ? getTravelBookingForDate(day.date) : null;
+    const travelShape   = travelBooking ? bookingToTravelShape(travelBooking) : null;
+    const effectiveTravel = day.travel || travelShape;
 
     return `
       <article class="day-card" data-idx="${idx}" data-place="${day.placeKey}" style="--city-color:${place.color}; --city-bg:${place.bg}">
@@ -572,7 +579,7 @@ function renderDayList(filter = 'all') {
               <span class="place-pill" style="background:${place.bg}; color:${place.color}">${place.emoji ? place.emoji + ' ' : ''}${place.name}</span>
             </div>
             <div class="day-preview">
-              ${hasTravel ? `<span class="day-travel-badge">${ITEM_TYPES[day.travel.mode]?.icon || '🚀'} ${day.travel.summary}</span>` : ''}
+              ${effectiveTravel ? `<span class="day-travel-badge">${ITEM_TYPES[effectiveTravel.mode]?.icon || '🚀'} ${effectiveTravel.summary}</span>` : ''}
               <span class="preview-text">${totalCount} item${totalCount !== 1 ? 's' : ''} · ${hotelName}</span>
             </div>
           </div>
@@ -589,6 +596,59 @@ function renderDayList(filter = 'all') {
   });
 
   highlightToday();
+}
+
+// ===================================================================
+//  BOOKING ↔ ITINERARY CROSS-REFERENCE
+// ===================================================================
+
+// Returns the hotel booking covering a given date (checkIn <= date < checkOut)
+function getStayBookingForDate(dateStr) {
+  if (!trip.bookings) return null;
+  return trip.bookings.find(b => {
+    if (b.category !== 'hotel' || !b.checkIn || !b.checkOut) return false;
+    return b.checkIn <= dateStr && dateStr < b.checkOut;
+  }) || null;
+}
+
+// Returns the first flight or rail booking departing on a given date
+function getTravelBookingForDate(dateStr) {
+  if (!trip.bookings) return null;
+  return trip.bookings.find(b => {
+    if (b.category === 'flight') {
+      return b.outbound?.departDate === dateStr;
+    }
+    if (b.category === 'rail') {
+      return b.transitDate === dateStr;
+    }
+    return false;
+  }) || null;
+}
+
+// Convert a booking into the shape the panel travel section expects
+function bookingToTravelShape(b) {
+  if (b.category === 'flight') {
+    const ob  = b.outbound || {};
+    const dep = ob.departTime ? ` · ${fmtTime12(ob.departTime)}` : '';
+    return {
+      mode:         'flight',
+      summary:      `${ob.departAirport || '?'} → ${ob.arriveAirport || '?'}${dep}`,
+      details:      `${b.title}${ob.flight ? ' · ' + ob.flight : ''}`,
+      confirmation: b.confirmation || '',
+      url:          b.url || '',
+    };
+  }
+  if (b.category === 'rail') {
+    const dep = b.transitTime ? ` · ${fmtTime12(b.transitTime)}` : '';
+    return {
+      mode:         'train',
+      summary:      `${b.transitFrom || '?'} → ${b.transitTo || '?'}${dep}`,
+      details:      b.title,
+      confirmation: b.confirmation || '',
+      url:          b.url || '',
+    };
+  }
+  return null;
 }
 
 // ===================================================================
@@ -629,17 +689,26 @@ function openDayPanel(dayIdx) {
   pillEl.style.background = place.bg;
   pillEl.style.color = place.color;
 
-  // Stay badge
-  const stayEl = panel.querySelector('.panel-stay');
-  if (day.stay) {
-    const stayUrl = day.stay.url ? ` <a href="${day.stay.url}" target="_blank" rel="noreferrer" class="stay-link">${ICONS.arrow}</a>` : '';
+  // Stay badge — explicit day.stay takes priority, fall back to booking lookup
+  const stayEl      = panel.querySelector('.panel-stay');
+  const stayBooking = !day.stay ? getStayBookingForDate(day.date) : null;
+  const stayData    = day.stay
+    ? { hotel: day.stay.hotel, room: day.stay.room, confirmation: day.stay.confirmation, url: day.stay.url, fromBooking: false }
+    : stayBooking
+      ? { hotel: stayBooking.title, room: '', confirmation: stayBooking.confirmation, url: stayBooking.url, fromBooking: true }
+      : null;
+
+  if (stayData) {
+    const stayUrl = stayData.url
+      ? ` <a href="${escHtml(stayData.url)}" target="_blank" rel="noreferrer" class="stay-link">${ICONS.arrow}</a>`
+      : '';
     stayEl.innerHTML = `
-      <div class="stay-badge">
+      <div class="stay-badge${stayData.fromBooking ? ' stay-badge-linked' : ''}">
         <span class="stay-icon">🏨</span>
         <div class="stay-info">
-          <strong>${day.stay.hotel}</strong>
-          ${day.stay.room ? `<span>${day.stay.room}</span>` : ''}
-          ${day.stay.confirmation ? `<span class="stay-conf">Conf: ${day.stay.confirmation}</span>` : ''}
+          <strong>${escHtml(stayData.hotel)}</strong>
+          ${stayData.room         ? `<span>${escHtml(stayData.room)}</span>` : ''}
+          ${stayData.confirmation ? `<span class="stay-conf">Conf: ${escHtml(stayData.confirmation)}</span>` : ''}
         </div>
         ${stayUrl}
       </div>`;
@@ -648,21 +717,29 @@ function openDayPanel(dayIdx) {
     stayEl.style.display = 'none';
   }
 
-  // Travel section
-  const travelEl = panel.querySelector('.panel-travel');
-  if (day.travel) {
-    const modeIcon = ITEM_TYPES[day.travel.mode]?.icon || '🚀';
-    const travelUrl = day.travel.url
-      ? `<a href="${day.travel.url}" target="_blank" rel="noreferrer" class="travel-link">${ICONS.arrow}</a>`
+  // Travel section — explicit day.travel takes priority, fall back to booking lookup
+  const travelEl      = panel.querySelector('.panel-travel');
+  const travelBooking = !day.travel ? getTravelBookingForDate(day.date) : null;
+  const travelShape   = travelBooking ? bookingToTravelShape(travelBooking) : null;
+  const travelData    = day.travel
+    ? { ...day.travel, fromBooking: false }
+    : travelShape
+      ? { ...travelShape, fromBooking: true }
+      : null;
+
+  if (travelData) {
+    const modeIcon = ITEM_TYPES[travelData.mode]?.icon || '🚀';
+    const travelUrl = travelData.url
+      ? `<a href="${escHtml(travelData.url)}" target="_blank" rel="noreferrer" class="travel-link">${ICONS.arrow}</a>`
       : '';
     travelEl.innerHTML = `
       <h4 class="panel-label">Travel</h4>
-      <div class="travel-card">
+      <div class="travel-card${travelData.fromBooking ? ' travel-card-linked' : ''}">
         <span class="travel-icon">${modeIcon}</span>
         <div class="travel-info">
-          <strong>${day.travel.summary}</strong>
-          <span>${day.travel.details}</span>
-          ${day.travel.confirmation ? `<span class="travel-conf">Conf: ${day.travel.confirmation}</span>` : ''}
+          <strong>${escHtml(travelData.summary)}</strong>
+          <span>${escHtml(travelData.details)}</span>
+          ${travelData.confirmation ? `<span class="travel-conf">Conf: ${escHtml(travelData.confirmation)}</span>` : ''}
         </div>
         ${travelUrl}
       </div>`;
