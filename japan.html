@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=31">
+  <link rel="stylesheet" href="styles.css?v=32">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body class="is-trip">
@@ -113,6 +113,8 @@
             <span class="inbox-toolbar-label">
               📬 <span id="inbox-badge" class="inbox-nav-badge" style="display:none">0</span>
             </span>
+            <button id="notify-btn" class="btn btn-outline btn-sm notify-toolbar-btn" title="Get notified when a booking arrives">🔔 Notify me</button>
+            <span id="notify-status" class="notify-status"></span>
             <button class="btn btn-primary btn-sm booking-add-top-btn" id="booking-add-top">+ Add</button>
           </div>
         </div>
@@ -157,23 +159,6 @@
         </button>
       </form>
     </aside>
-
-    <!-- Notifications -->
-    <section class="section notify-section">
-      <div class="container">
-        <div class="notify-card">
-          <div>
-            <span class="label">Reminders</span>
-            <h3>Get notified before events</h3>
-            <p>Enable browser notifications for check-ins, flights, and upcoming activities.</p>
-          </div>
-          <div class="notify-actions">
-            <button id="notify-btn" class="btn btn-outline">Enable notifications</button>
-            <span class="notify-status" id="notify-status"></span>
-          </div>
-        </div>
-      </div>
-    </section>
 
   </main>
 
@@ -316,6 +301,6 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=32"></script>
 </body>
 </html>

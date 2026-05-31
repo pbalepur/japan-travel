@@ -2328,6 +2328,10 @@ select {
   color: var(--ink-muted);
 }
 
+/* Inline notify button in booking toolbar */
+.notify-toolbar-btn { opacity: 0.75; }
+.notify-toolbar-btn:disabled { display: none; } /* hide once enabled */
+
 /* ===== MOBILE NAV ===== */
 .mobile-nav {
   display: none;
