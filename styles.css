@@ -4835,3 +4835,26 @@ body.is-readonly .panel-item .pi-ext-link {
 /* Booking panel — fully blocked via pointer-events on card, but also
    hide the edit form body if someone manages to open it */
 body.is-readonly .booking-panel-body { pointer-events: none; }
+
+/* ================================================
+   SITE FOOTER — version stamp
+   ================================================ */
+.site-footer {
+  text-align: center;
+  padding: 1.5rem 1rem 2.5rem;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  opacity: 0.6;
+}
+.site-footer-sep {
+  margin: 0 0.4em;
+}
+.site-footer-version {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.1em 0.45em;
+}

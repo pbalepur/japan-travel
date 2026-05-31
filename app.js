@@ -3,6 +3,8 @@
    Data-driven · Leaflet map · Slide-in panel · Export/Import
    ============================================================ */
 
+const APP_VERSION = 'v36';
+
 // ── Activity type config (UI only — not trip data) ──
 const ITEM_TYPES = {
   flight:     { icon: '✈️',  label: 'Flight',     color: '#6366f1' },
@@ -3906,6 +3908,10 @@ async function init() {
     const target = document.querySelector(location.hash);
     if (target) target.scrollIntoView({ block: 'start' });
   }
+
+  // Stamp version number in footer
+  const verEl = $('#app-version');
+  if (verEl) verEl.textContent = APP_VERSION;
 }
 
 init();
