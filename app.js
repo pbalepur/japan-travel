@@ -3692,6 +3692,12 @@ async function init() {
 
   // Periodic updates
   setInterval(() => { renderCountdown(); highlightToday(); }, 3600000);
+
+  // Re-honour URL hash after all content has rendered (day-list expansion shifts layout)
+  if (location.hash) {
+    const target = document.querySelector(location.hash);
+    if (target) target.scrollIntoView({ block: 'start' });
+  }
 }
 
 init();
