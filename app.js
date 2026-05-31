@@ -3,7 +3,7 @@
    Data-driven · Leaflet map · Slide-in panel · Export/Import
    ============================================================ */
 
-const APP_VERSION = 'v36';
+const APP_VERSION = 'v37';
 
 // ── Activity type config (UI only — not trip data) ──
 const ITEM_TYPES = {
@@ -547,6 +547,73 @@ function renderPlaces() {
   if (!cityNav) return;
   renderPlacesNormal(cityNav);
   renderPlacesEditStrip();
+  renderDuplicatePlacesBanner();
+}
+
+// Show a merge-prompt banner when two trip.places entries share the same display name
+function renderDuplicatePlacesBanner() {
+  const existing = $('#dup-places-banner');
+  if (existing) existing.remove();
+  if (!isEditMode()) return;
+
+  // Group keys by normalised name
+  const byName = {};
+  for (const [key, p] of Object.entries(trip.places)) {
+    const norm = p.name.trim().toLowerCase();
+    (byName[norm] ??= []).push(key);
+  }
+  const dupGroups = Object.entries(byName).filter(([, keys]) => keys.length > 1);
+  if (!dupGroups.length) return;
+
+  const section = document.querySelector('.route-section .container');
+  if (!section) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'dup-places-banner';
+  banner.className = 'dup-places-banner';
+  const lines = dupGroups.map(([norm, keys]) => {
+    const name = trip.places[keys[0]]?.name || norm;
+    return `<span class="dup-place-name">${escHtml(name)}</span>
+      <button class="btn btn-xs btn-outline dup-merge-btn" data-keys="${escHtml(keys.join(','))}">Merge</button>`;
+  });
+  banner.innerHTML = `
+    <span class="dup-icon">⚠️</span>
+    <span class="dup-text">Duplicate places detected:</span>
+    ${lines.join('<span class="dup-sep"> · </span>')}
+    <span class="dup-hint">(Merge keeps the first entry and reassigns all linked days &amp; bookings)</span>`;
+
+  // Inject just before #city-nav
+  const cityNav = $('#city-nav');
+  if (cityNav) cityNav.insertAdjacentElement('beforebegin', banner);
+  else section.appendChild(banner);
+
+  banner.querySelectorAll('.dup-merge-btn').forEach(btn => {
+    btn.addEventListener('click', () => mergeDuplicatePlaces(btn.dataset.keys.split(',')));
+  });
+}
+
+function mergeDuplicatePlaces(keys) {
+  if (keys.length < 2) return;
+  const [keepKey, ...removeKeys] = keys;
+  const keepPlace = trip.places[keepKey];
+  if (!keepPlace) return;
+
+  removeKeys.forEach(oldKey => {
+    if (!trip.places[oldKey]) return;
+    // Reassign days
+    trip.days.forEach(d => { if (d.placeKey === oldKey) d.placeKey = keepKey; });
+    // Reassign route stops
+    trip.route.forEach(r => { if (r.key === oldKey) r.key = keepKey; });
+    // Reassign bookings
+    trip.bookings.forEach(b => { if (b.colorKey === oldKey) b.colorKey = keepKey; });
+    // Remove duplicate place entry
+    delete trip.places[oldKey];
+  });
+
+  saveTrip();
+  renderPlaces(); renderFilterBar(); renderRouteMap();
+  renderBookingFilters(); renderBookings();
+  showToast(`Merged into ${keepPlace.name}`);
 }
 
 function renderPlacesEditStrip() {
@@ -2084,11 +2151,67 @@ async function _apmSelectResult(p) {
 function _apmConfirm() {
   if (!_apmSelected) return;
 
-  const p     = _apmSelected;
-  const raw   = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-  // avoid key collisions
-  let key = raw || 'place';
-  if (trip.places[key]) key = key + Object.keys(trip.places).length;
+  const p = _apmSelected;
+
+  // ── Duplicate name check ──────────────────────────────────────────────────
+  // If a place with the same name already exists, merge into it rather than
+  // creating a second entry (which pollutes Places tiles and booking dropdowns).
+  const existingEntry = Object.entries(trip.places).find(
+    ([, v]) => v.name.trim().toLowerCase() === p.name.trim().toLowerCase()
+  );
+  if (existingEntry) {
+    const [existingKey, existingPlace] = existingEntry;
+    const confirmBtn = $('#apm-confirm-btn');
+    // Show an inline warning the first time; on second click, proceed as merge
+    if (!confirmBtn?.dataset.mergeReady) {
+      const warnEl = document.createElement('p');
+      warnEl.className = 'apm-dup-warn';
+      warnEl.innerHTML = `⚠️ <strong>${escHtml(p.name)}</strong> already exists in your trip. `
+        + `Click <em>Update existing</em> to refresh its image &amp; coordinates, or <em>Add separately</em> to keep both.`;
+      const actions = $('#apm-confirm-btn')?.closest('.apm-confirm-actions');
+      if (actions && !actions.querySelector('.apm-dup-warn')) actions.insertAdjacentElement('beforebegin', warnEl);
+      if (confirmBtn) { confirmBtn.textContent = 'Update existing'; confirmBtn.dataset.mergeReady = '1'; }
+      const addSepBtn = document.createElement('button');
+      addSepBtn.className = 'btn btn-outline';
+      addSepBtn.textContent = 'Add separately';
+      addSepBtn.addEventListener('click', () => {
+        // Force-add as new entry with a disambiguated key
+        if (confirmBtn) { delete confirmBtn.dataset.mergeReady; confirmBtn.textContent = 'Add to Journey'; }
+        _apmConfirmNew(p, /*forceDup=*/true);
+      });
+      actions?.appendChild(addSepBtn);
+      return; // wait for second click
+    }
+    // Second click → merge: update coords/img/emoji on the existing place
+    delete confirmBtn.dataset.mergeReady;
+    existingPlace.lat   = p.lat;
+    existingPlace.lng   = p.lng;
+    if (_apmImgUrl) existingPlace.img = _apmImgUrl;
+    existingPlace.emoji = _apmEmoji;
+    closeAddPlaceModal();
+    if (iepAddingPlace) {
+      iepAddingPlace = false;
+      saveTrip();
+      iepSegments.push({ segId: generateId(), key: existingKey, nights: _apmNights });
+      if (iepAutoBalance) iepRebalance();
+      renderIEP();
+    } else {
+      trip.route.push({ city: p.name, dates: 'TBD', nights: _apmNights, key: existingKey });
+      saveTrip();
+      renderPlaces(); renderRouteMap(); renderFilterBar();
+    }
+    showToast(`${p.name} updated`);
+    return;
+  }
+
+  _apmConfirmNew(p, false);
+}
+
+function _apmConfirmNew(p, forceDup) {
+  const raw = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let key   = raw || 'place';
+  // Only suffix when key already taken (forced-dup path or coincidental collision)
+  if (trip.places[key]) key = key + '_' + Date.now().toString(36);
 
   const color = pickUnusedColor();
 
@@ -2321,11 +2444,79 @@ function renderBookingFilters() {
   if (sel) sel.addEventListener('change', () => { bookingPlaceFilter = sel.value; renderBookings(); });
 }
 
+// Returns array of {a, b} pairs where two hotel bookings overlap in dates.
+// Hotel nights are [checkIn, checkOut), i.e. checking out = no longer there.
+function detectHotelConflicts() {
+  const hotels = trip.bookings
+    .map((b, i) => ({ ...b, _idx: i }))
+    .filter(b => b.category === 'hotel' && b.checkIn && b.checkOut);
+
+  const conflicts = [];
+  for (let i = 0; i < hotels.length; i++) {
+    for (let j = i + 1; j < hotels.length; j++) {
+      const a = hotels[i], b = hotels[j];
+      // Overlap when a starts before b ends AND b starts before a ends
+      if (a.checkIn < b.checkOut && b.checkIn < a.checkOut) {
+        conflicts.push({ a, b });
+      }
+    }
+  }
+  return conflicts;
+}
+
+function renderBookingConflictBanner() {
+  const existing = $('#booking-conflict-banner');
+  if (existing) existing.remove();
+
+  const conflicts = detectHotelConflicts();
+
+  // Update sticky-nav Bookings link badge
+  const navLink = document.querySelector('.snav-link[data-section="bookings"]');
+  if (navLink) {
+    let badge = navLink.querySelector('.conflict-badge');
+    if (conflicts.length) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'conflict-badge'; navLink.appendChild(badge); }
+      badge.textContent = conflicts.length;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  if (!conflicts.length) return;
+
+  const grid = $('#booking-grid');
+  if (!grid) return;
+
+  const rows = conflicts.map(({ a, b }) => {
+    const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '?';
+    return `<div class="bcb-row">
+      <span class="bcb-hotel">${escHtml(a.title)}</span>
+      <span class="bcb-dates">${fmt(a.checkIn)}–${fmt(a.checkOut)}</span>
+      <span class="bcb-vs">overlaps</span>
+      <span class="bcb-hotel">${escHtml(b.title)}</span>
+      <span class="bcb-dates">${fmt(b.checkIn)}–${fmt(b.checkOut)}</span>
+    </div>`;
+  }).join('');
+
+  const banner = document.createElement('div');
+  banner.id = 'booking-conflict-banner';
+  banner.className = 'booking-conflict-banner';
+  banner.innerHTML = `
+    <div class="bcb-header">
+      <span class="bcb-icon">⚠️</span>
+      <strong>${conflicts.length} overlapping hotel booking${conflicts.length > 1 ? 's' : ''}</strong>
+      <span class="bcb-hint">— you have two hotels booked for the same night(s)</span>
+    </div>
+    <div class="bcb-list">${rows}</div>`;
+  grid.insertAdjacentElement('beforebegin', banner);
+}
+
 function renderBookings() {
   const container = $('#booking-grid');
   if (!container) return;
 
   sortBookings();
+  renderBookingConflictBanner();
 
   let filtered = trip.bookings;
   if (bookingFilter !== 'all') filtered = filtered.filter(b => b.category === bookingFilter);

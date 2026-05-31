@@ -4858,3 +4858,89 @@ body.is-readonly .booking-panel-body { pointer-events: none; }
   border-radius: 3px;
   padding: 0.1em 0.45em;
 }
+
+/* ================================================
+   DUPLICATE PLACES BANNER
+   ================================================ */
+.dup-places-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem .6rem;
+  background: #fffbeb;
+  border: 1.5px solid #f59e0b;
+  border-radius: var(--radius);
+  padding: .6rem .9rem;
+  font-size: .82rem;
+  margin-bottom: 1rem;
+  color: var(--ink);
+}
+.dup-icon { font-size: 1rem; }
+.dup-text { font-weight: 600; color: #92400e; }
+.dup-place-name { font-weight: 600; }
+.dup-sep { color: var(--ink-muted); }
+.dup-hint { color: var(--ink-muted); font-size: .75rem; width: 100%; margin-top: .1rem; }
+.dup-merge-btn { font-size: .75rem !important; padding: .15rem .5rem !important; }
+.apm-dup-warn {
+  font-size: .82rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius);
+  padding: .5rem .7rem;
+  margin-bottom: .75rem;
+  line-height: 1.4;
+}
+
+/* ================================================
+   BOOKING CONFLICT BANNER
+   ================================================ */
+.booking-conflict-banner {
+  background: #fff7ed;
+  border: 1.5px solid #f97316;
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: .84rem;
+}
+.bcb-header {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin-bottom: .4rem;
+}
+.bcb-icon { font-size: 1rem; }
+.bcb-header strong { color: #9a3412; }
+.bcb-hint { color: var(--ink-muted); }
+.bcb-list { display: flex; flex-direction: column; gap: .3rem; padding-left: 1.6rem; }
+.bcb-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .2rem .5rem;
+  font-size: .8rem;
+  color: var(--ink);
+}
+.bcb-hotel { font-weight: 600; }
+.bcb-dates { color: var(--ink-muted); font-size: .76rem; }
+.bcb-vs { color: #ef4444; font-size: .74rem; font-style: italic; }
+
+/* ── Nav conflict badge ── */
+.snav-link { position: relative; }
+.conflict-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .6rem;
+  font-weight: 700;
+  border-radius: 99px;
+  min-width: 15px;
+  height: 15px;
+  line-height: 15px;
+  text-align: center;
+  padding: 0 3px;
+  pointer-events: none;
+}
