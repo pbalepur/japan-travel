@@ -3,7 +3,7 @@
    Data-driven · Leaflet map · Slide-in panel · Export/Import
    ============================================================ */
 
-const APP_VERSION = 'v37';
+const APP_VERSION = 'v38';
 
 // ── Activity type config (UI only — not trip data) ──
 const ITEM_TYPES = {
@@ -547,73 +547,6 @@ function renderPlaces() {
   if (!cityNav) return;
   renderPlacesNormal(cityNav);
   renderPlacesEditStrip();
-  renderDuplicatePlacesBanner();
-}
-
-// Show a merge-prompt banner when two trip.places entries share the same display name
-function renderDuplicatePlacesBanner() {
-  const existing = $('#dup-places-banner');
-  if (existing) existing.remove();
-  if (!isEditMode()) return;
-
-  // Group keys by normalised name
-  const byName = {};
-  for (const [key, p] of Object.entries(trip.places)) {
-    const norm = p.name.trim().toLowerCase();
-    (byName[norm] ??= []).push(key);
-  }
-  const dupGroups = Object.entries(byName).filter(([, keys]) => keys.length > 1);
-  if (!dupGroups.length) return;
-
-  const section = document.querySelector('.route-section .container');
-  if (!section) return;
-
-  const banner = document.createElement('div');
-  banner.id = 'dup-places-banner';
-  banner.className = 'dup-places-banner';
-  const lines = dupGroups.map(([norm, keys]) => {
-    const name = trip.places[keys[0]]?.name || norm;
-    return `<span class="dup-place-name">${escHtml(name)}</span>
-      <button class="btn btn-xs btn-outline dup-merge-btn" data-keys="${escHtml(keys.join(','))}">Merge</button>`;
-  });
-  banner.innerHTML = `
-    <span class="dup-icon">⚠️</span>
-    <span class="dup-text">Duplicate places detected:</span>
-    ${lines.join('<span class="dup-sep"> · </span>')}
-    <span class="dup-hint">(Merge keeps the first entry and reassigns all linked days &amp; bookings)</span>`;
-
-  // Inject just before #city-nav
-  const cityNav = $('#city-nav');
-  if (cityNav) cityNav.insertAdjacentElement('beforebegin', banner);
-  else section.appendChild(banner);
-
-  banner.querySelectorAll('.dup-merge-btn').forEach(btn => {
-    btn.addEventListener('click', () => mergeDuplicatePlaces(btn.dataset.keys.split(',')));
-  });
-}
-
-function mergeDuplicatePlaces(keys) {
-  if (keys.length < 2) return;
-  const [keepKey, ...removeKeys] = keys;
-  const keepPlace = trip.places[keepKey];
-  if (!keepPlace) return;
-
-  removeKeys.forEach(oldKey => {
-    if (!trip.places[oldKey]) return;
-    // Reassign days
-    trip.days.forEach(d => { if (d.placeKey === oldKey) d.placeKey = keepKey; });
-    // Reassign route stops
-    trip.route.forEach(r => { if (r.key === oldKey) r.key = keepKey; });
-    // Reassign bookings
-    trip.bookings.forEach(b => { if (b.colorKey === oldKey) b.colorKey = keepKey; });
-    // Remove duplicate place entry
-    delete trip.places[oldKey];
-  });
-
-  saveTrip();
-  renderPlaces(); renderFilterBar(); renderRouteMap();
-  renderBookingFilters(); renderBookings();
-  showToast(`Merged into ${keepPlace.name}`);
 }
 
 function renderPlacesEditStrip() {
@@ -2153,41 +2086,19 @@ function _apmConfirm() {
 
   const p = _apmSelected;
 
-  // ── Duplicate name check ──────────────────────────────────────────────────
-  // If a place with the same name already exists, merge into it rather than
-  // creating a second entry (which pollutes Places tiles and booking dropdowns).
+  // ── Duplicate guard: one place entity per name, always ───────────────────
+  // If a place with the same name already exists, silently reuse its key and
+  // freshen its coordinates / image. Creating a second entry is never correct.
   const existingEntry = Object.entries(trip.places).find(
     ([, v]) => v.name.trim().toLowerCase() === p.name.trim().toLowerCase()
   );
+
   if (existingEntry) {
     const [existingKey, existingPlace] = existingEntry;
-    const confirmBtn = $('#apm-confirm-btn');
-    // Show an inline warning the first time; on second click, proceed as merge
-    if (!confirmBtn?.dataset.mergeReady) {
-      const warnEl = document.createElement('p');
-      warnEl.className = 'apm-dup-warn';
-      warnEl.innerHTML = `⚠️ <strong>${escHtml(p.name)}</strong> already exists in your trip. `
-        + `Click <em>Update existing</em> to refresh its image &amp; coordinates, or <em>Add separately</em> to keep both.`;
-      const actions = $('#apm-confirm-btn')?.closest('.apm-confirm-actions');
-      if (actions && !actions.querySelector('.apm-dup-warn')) actions.insertAdjacentElement('beforebegin', warnEl);
-      if (confirmBtn) { confirmBtn.textContent = 'Update existing'; confirmBtn.dataset.mergeReady = '1'; }
-      const addSepBtn = document.createElement('button');
-      addSepBtn.className = 'btn btn-outline';
-      addSepBtn.textContent = 'Add separately';
-      addSepBtn.addEventListener('click', () => {
-        // Force-add as new entry with a disambiguated key
-        if (confirmBtn) { delete confirmBtn.dataset.mergeReady; confirmBtn.textContent = 'Add to Journey'; }
-        _apmConfirmNew(p, /*forceDup=*/true);
-      });
-      actions?.appendChild(addSepBtn);
-      return; // wait for second click
-    }
-    // Second click → merge: update coords/img/emoji on the existing place
-    delete confirmBtn.dataset.mergeReady;
     existingPlace.lat   = p.lat;
     existingPlace.lng   = p.lng;
-    if (_apmImgUrl) existingPlace.img = _apmImgUrl;
     existingPlace.emoji = _apmEmoji;
+    if (_apmImgUrl) existingPlace.img = _apmImgUrl;
     closeAddPlaceModal();
     if (iepAddingPlace) {
       iepAddingPlace = false;
@@ -2200,24 +2111,19 @@ function _apmConfirm() {
       saveTrip();
       renderPlaces(); renderRouteMap(); renderFilterBar();
     }
-    showToast(`${p.name} updated`);
+    showToast(`${p.name} added`);
     return;
   }
 
-  _apmConfirmNew(p, false);
-}
-
-function _apmConfirmNew(p, forceDup) {
-  const raw = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-  let key   = raw || 'place';
-  // Only suffix when key already taken (forced-dup path or coincidental collision)
+  // New place — create a fresh entry
+  const raw   = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let   key   = raw || 'place';
+  // Guard against an unlikely key collision with a differently-named place
   if (trip.places[key]) key = key + '_' + Date.now().toString(36);
-
-  const color = pickUnusedColor();
 
   trip.places[key] = {
     name:  p.name,
-    color,
+    color: pickUnusedColor(),
     bg:    '#f5f0e8',
     emoji: _apmEmoji,
     img:   _apmImgUrl || '',
@@ -2237,9 +2143,7 @@ function _apmConfirmNew(p, forceDup) {
   } else {
     trip.route.push({ city: p.name, dates: 'TBD', nights: _apmNights, key });
     saveTrip();
-    renderPlaces();
-    renderRouteMap();
-    renderFilterBar();
+    renderPlaces(); renderRouteMap(); renderFilterBar();
     showToast(`${p.name} added to your trip`);
   }
 }
@@ -4036,6 +3940,32 @@ async function init() {
       d.title = defaultDayTitle(d.placeKey, perPlaceN[d.placeKey]);
     });
     trip.meta.version = 5;
+    saveLocal();
+  }
+
+  // Migration v6: collapse duplicate trip.places entries that share the same name.
+  // Earlier versions of the Add Place flow could create e.g. "hiroshima" and "hiroshima12"
+  // both named "Hiroshima". Keep the first key alphabetically; reassign all days, route
+  // stops and bookings that referenced the duplicate key(s).
+  if ((trip.meta?.version || 1) < 6) {
+    const byName = {};
+    for (const [key, p] of Object.entries(trip.places)) {
+      const norm = p.name.trim().toLowerCase();
+      (byName[norm] ??= []).push(key);
+    }
+    let merged = false;
+    for (const keys of Object.values(byName)) {
+      if (keys.length < 2) continue;
+      const [keepKey, ...dropKeys] = keys;
+      dropKeys.forEach(oldKey => {
+        trip.days.forEach(d     => { if (d.placeKey  === oldKey) d.placeKey  = keepKey; });
+        trip.route.forEach(r    => { if (r.key        === oldKey) r.key        = keepKey; });
+        trip.bookings.forEach(b => { if (b.colorKey   === oldKey) b.colorKey   = keepKey; });
+        delete trip.places[oldKey];
+        merged = true;
+      });
+    }
+    trip.meta.version = 6;
     saveLocal();
   }
 
